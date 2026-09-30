@@ -403,6 +403,45 @@ select.input option { background: var(--surface-1); color: var(--text-primary); 
 .empty-state h3 { font-size: 18px; color: var(--text-primary); margin-bottom: 6px; }
 .empty-state .btn { margin-top: 14px; }
 
+
+/* ============ classificação: tabela única ============ */
+.score-wrap { border: 1px solid var(--grid-line); border-radius: 14px; }
+table.score { border-collapse: separate; border-spacing: 0; width: max-content; min-width: 100%; }
+table.score th, table.score td { border-bottom: 1px solid var(--grid-line); background: var(--surface-1); }
+table.score tbody tr:last-child td { border-bottom: 0; }
+table.score thead th { position: sticky; top: 0; z-index: 2; font-weight: 600; vertical-align: bottom; padding: 10px 6px; text-align: center; }
+table.score .stk { position: sticky; z-index: 3; }
+table.score thead .stk { z-index: 4; color: var(--text-muted); font-size: 11px; text-transform: uppercase; letter-spacing: .07em; text-align: left; padding: 10px 14px; }
+table.score thead .stk.r { text-align: right; }
+table.score .s1 { left: 0; width: 262px; min-width: 262px; max-width: 262px; padding: 10px 8px 10px 14px; }
+table.score .s2 { left: 262px; width: 118px; min-width: 118px; padding: 10px 14px; text-align: right; border-right: 1px solid var(--grid-line); box-shadow: 6px 0 10px -8px rgba(0, 0, 0, .35); }
+table.score tbody tr:hover td { background: var(--surface-2); }
+table.score tr.out td { color: var(--text-muted); }
+.who-row { display: grid; grid-template-columns: 34px 30px minmax(0, 1fr); align-items: center; }
+.who-row .who > div { min-width: 0; }
+.who-row .who .nm, .who-row .who .st { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.pts-line { display: flex; align-items: baseline; justify-content: flex-end; gap: 6px; }
+.sub-line { display: flex; align-items: center; justify-content: flex-end; gap: 6px; margin-top: 4px; font-size: 11px; color: var(--text-muted); white-space: nowrap; }
+.sub-line .pin { width: 15px; height: 15px; }
+
+table.score .wkh { min-width: 92px; }
+table.score .wkh .wl { font-size: 11px; text-transform: uppercase; letter-spacing: .05em; color: var(--text-primary); white-space: nowrap; }
+table.score .wkh .pv { font-size: 10.5px; font-weight: 500; color: var(--text-muted); line-height: 1.25; margin-top: 3px; white-space: nowrap; }
+table.score .wkh.cur .wl { color: var(--accent); }
+table.score td.wkc { padding: 8px 6px; text-align: center; }
+table.score td.wkc.cur, table.score .wkh.cur { background: color-mix(in srgb, var(--accent-strong) 6%, var(--surface-1)); }
+table.score tbody tr:hover td.wkc.cur { background: color-mix(in srgb, var(--accent-strong) 8%, var(--surface-2)); }
+.wkc .chips { display: flex; gap: 3px; justify-content: center; }
+.wkc .chips .code { min-width: 38px; height: 26px; font-size: 11px; border-radius: 7px; }
+.wkc .wkm { display: flex; gap: 6px; justify-content: center; align-items: center; margin-top: 5px; height: 20px; }
+.wkc .wp { font-size: 11.5px; font-weight: 700; color: var(--text-secondary); min-width: 24px; font-variant-numeric: tabular-nums; }
+.wkc .wp.plus { color: var(--good); }
+.wkc .wp.minus { color: var(--critical); }
+tr.out .wkc .wp.plus, tr.out .wkc .wp.minus { color: var(--text-muted); }
+.wkc .rk { width: auto; min-width: 28px; height: 20px; padding: 0 5px; font-size: 11px; }
+.wkc.gone { padding: 8px 6px; }
+.gone-fill { display: block; height: 51px; border-radius: 7px; background: repeating-linear-gradient(135deg, transparent 0 5px, var(--grid-line) 5px 6px); }
+
 /* ============ responsivo ============ */
 @media (max-width: 1080px) {
   .hero { grid-template-columns: minmax(0, 1fr); }
@@ -430,5 +469,13 @@ select.input option { background: var(--surface-1); color: var(--text-primary); 
   .input { min-width: 0; width: 100%; }
   .picker { width: min(300px, calc(100vw - 24px)); }
   .ed-grid { grid-template-columns: minmax(0, 1fr); }
+  table.score .s1 { width: 132px; min-width: 132px; max-width: 132px; padding-left: 10px; }
+  table.score .s2 { left: 132px; width: 70px; min-width: 70px; padding: 10px 8px; }
+  .who-row .who .st { display: none; }
+  table.score .s2 .chip-delta { display: none; }
+  .who-row .pos { font-size: 14px; }
+  .who-row { grid-template-columns: 30px minmax(0, 1fr); }
+  .who-row .mv, .who-row .avatar { display: none; }
+  .sub-line span:last-child { display: none; }
   .ed-select select { max-width: 170px; }
 }

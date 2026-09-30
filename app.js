@@ -247,7 +247,7 @@
   const pinIcon = (cls = "pin") => `<svg class="${cls}" aria-hidden="true"><use href="#pin"/></svg>`;
   const pinsHtml = (n) => (n ? `<span class="pins" title="${n} pin${n > 1 ? "s" : ""}">${pinIcon().repeat(n)}</span>` : '<span class="dash">—</span>');
   const shortWeek = (label) => label.replace(/^Semana\s*/i, "S").replace(/^Repescagem$/i, "Rep");
-  const statusText = (c) => (c.eliminated ? `Eliminado · ${data.weeks[c.outWeek].label}` : c.wasOut ? "Na disputa · voltou" : "Na disputa");
+  const statusText = (c) => (c.eliminated ? `Eliminado · ${shortWeek(data.weeks[c.outWeek].label)}` : c.wasOut ? "Na disputa · voltou" : "Na disputa");
   const statusClass = (c) => (c.eliminated ? "off" : c.wasOut ? "back" : "");
   const icons = {
     trophy: '<svg viewBox="0 0 24 24"><path fill="currentColor" d="M7 3h10v2h3v3a4 4 0 0 1-4 4h-.3A5 5 0 0 1 13 14.9V18h3v3H8v-3h3v-3.1A5 5 0 0 1 8.3 12H8a4 4 0 0 1-4-4V5h3V3Zm0 4H6v1a2 2 0 0 0 1 1.7V7Zm10 0v2.7A2 2 0 0 0 18 8V7h-1Z"/></svg>',
@@ -321,61 +321,55 @@
       <div class="facts">${facts.map((f) => `<div class="fact ${f.wide ? "wide" : ""}"><span class="ico">${f.ico}</span><div><div class="lbl">${f.lbl}</div><div class="val">${f.val}</div></div><div class="side">${f.side}</div></div>`).join("")}</div>`;
   }
 
-  /* ---------------- render: classificação ---------------- */
+  /* ---------------- render: classificação (tabela única: pontos + resultado de cada episódio) ---------------- */
   function renderRanking() {
     const only = $("#onlyActive").checked;
     const rows = model.sorted.filter((c) => !only || !c.eliminated);
     const w = model.currentWeek;
-    const weeks = data.weeks.slice(0, w + 1);
+    const shown = data.weeks.slice(0, Math.max(w + 1, 1));
     const move = (c) => {
       const d = c.prevPos - c.pos;
       if (w <= 0 || d === 0) return `<span class="move same" title="Mesma posição do episódio anterior">–</span>`;
       return d > 0 ? `<span class="move up" title="Subiu ${d}">▲${d}</span>` : `<span class="move down" title="Caiu ${-d}">▼${-d}</span>`;
     };
-    const rk = (c, i) => {
-      if (!c.present[i]) return `<span class="rk none">·</span>`;
-      const r = c.rankHistory[i];
-      const tip = `${esc(c.name)} · ${esc(data.weeks[i].label)}<br><b>${r}º lugar</b> · ${fmt(c.cum[i])} pts${c.weekly[i] != null ? ` (${signed(c.weekly[i])} na semana)` : ""}`;
-      return `<span class="rk ${r <= 3 ? "r" + r : ""} ${i === w ? "last" : ""}" data-tip="${esc(tip)}">${r}</span>`;
+    const chip = (c, i) => {
+      const code = c.results[i];
+      const wk = data.weeks[Math.floor(i / 2)];
+      const p = model.pts[code];
+      const tip = `${esc(c.name)} · ${esc(wk.label)} · ${esc(wk.provas[i % 2] || (i % 2 ? "2ª prova" : "1ª prova"))}<br><b>${esc(codeLabel(code))}</b>${p != null ? ` · ${signed(p)} pts` : ""}`;
+      return `<span class="code ${codeClass(code)} ${code === "V" ? "win" : ""}" data-tip="${tip}">${esc(codeText(code))}</span>`;
+    };
+    const weekCell = (c, wi) => {
+      const cls = `wkc ${wi === w ? "cur" : ""}`;
+      if (!c.present[wi]) return `<td class="${cls} gone"><span class="gone-fill" title="Fora da competição"></span></td>`;
+      const r = c.rankHistory[wi];
+      const wp = c.weekly[wi];
+      const rankTip = `${esc(c.name)} · ${esc(data.weeks[wi].label)}<br><b>${r}º lugar</b> · ${fmt(c.cum[wi])} pts no total`;
+      return `<td class="${cls}">
+        <div class="chips">${chip(c, 2 * wi)}${chip(c, 2 * wi + 1)}</div>
+        <div class="wkm">
+          <span class="wp ${wp > 0 ? "plus" : wp < 0 ? "minus" : ""}">${wp == null ? "—" : signed(wp)}</span>
+          ${wi <= w ? `<span class="rk ${r <= 3 ? "r" + r : ""}" data-tip="${rankTip}">${r}º</span>` : ""}
+        </div></td>`;
     };
     $("#rankTable").innerHTML = `
       <thead><tr>
-        <th>#</th><th></th><th>Competidor</th><th class="r">Pontos</th><th>Pins</th><th class="c" title="Vitórias em equipe e duelos">Vit. equipe</th>
-        ${weeks.map((x, i) => `<th class="wk ${i === 0 ? "sep" : ""}" title="${esc(x.label)}">${esc(shortWeek(x.label))}</th>`).join("")}
+        <th class="stk s1">Competidor</th>
+        <th class="stk s2 r">Pontos</th>
+        ${shown.map((x, i) => `<th class="wkh ${i === w ? "cur" : ""}"><div class="wl">${esc(x.label)}</div><div class="pv">${x.provas.map((p) => esc(p || "—")).join("<br>")}</div></th>`).join("")}
       </tr></thead>
       <tbody>${rows.map((c) => `
         <tr class="${c.eliminated ? "out" : ""}">
-          <td class="pos ${w >= 0 && c.pos <= 3 && !c.eliminated ? "top" : ""} num">${w >= 0 ? c.pos + "º" : "–"}</td>
-          <td>${move(c)}</td>
-          <td><div class="who">${avatar(c)}<div><div class="nm">${esc(c.name)}</div><div class="st ${statusClass(c)}">${statusText(c)}</div></div></div></td>
-          <td class="r"><span class="pts-big num">${fmt(c.total)}</span>
-            ${w > 0 && !c.eliminated ? ` <span class="chip-delta ${c.delta > 0 ? "plus" : c.delta < 0 ? "minus" : ""}" title="Pontos no último episódio">${signed(c.delta)}</span>` : ""}</td>
-          <td>${pinsHtml(c.pins)}</td>
-          <td class="c num">${c.teamWins}</td>
-          ${weeks.map((_, i) => `<td class="wk ${i === 0 ? "sep" : ""}">${rk(c, i)}</td>`).join("")}
-        </tr>`).join("")}</tbody>`;
-  }
-
-  function renderBoard() {
-    const shownW = Math.max(model.currentWeek + 1, 1);
-    const weeks = data.weeks.slice(0, shownW);
-    const only = $("#onlyActive").checked;
-    const rows = model.sorted.filter((c) => !only || !c.eliminated);
-    $("#boardTable").innerHTML = `
-      <thead>
-        <tr class="weeks"><th class="name"></th>${weeks.map((w) => `<th colspan="2">${esc(w.label)}</th>`).join("")}<th></th></tr>
-        <tr class="provas"><th class="name">Competidor</th>${weeks.map((w) => w.provas.map((p) => `<th>${esc(p || "—")}</th>`).join("")).join("")}<th>Total</th></tr>
-      </thead>
-      <tbody>${rows.map((c) => `
-        <tr>
-          <td class="name"><div class="who">${avatar(c)}${esc(c.name)}</div></td>
-          ${c.results.slice(0, weeks.length * 2).map((code, i) => {
-            const w = Math.floor(i / 2);
-            const p = model.pts[code];
-            const tip = `${esc(c.name)} · ${esc(data.weeks[w].label)} · ${esc(data.weeks[w].provas[i % 2] || "prova")}<br><b>${esc(codeLabel(code))}</b>${p != null ? ` · ${signed(p)} pts` : ""}`;
-            return `<td><span class="code ${codeClass(code)} ${code === "V" ? "win" : ""}" data-tip="${tip}">${esc(codeText(code))}</span></td>`;
-          }).join("")}
-          <td class="tot num">${fmt(c.total)}</td>
+          <td class="stk s1"><div class="who-row">
+            <span class="pos ${w >= 0 && c.pos <= 3 && !c.eliminated ? "top" : ""} num">${w >= 0 ? c.pos + "º" : "–"}</span>
+            <span class="mv">${move(c)}</span>
+            <div class="who">${avatar(c)}<div><div class="nm">${esc(c.name)}</div><div class="st ${statusClass(c)}">${statusText(c)}</div></div></div>
+          </div></td>
+          <td class="stk s2 r">
+            <div class="pts-line"><span class="pts-big num">${fmt(c.total)}</span>${w > 0 && !c.eliminated ? `<span class="chip-delta ${c.delta > 0 ? "plus" : c.delta < 0 ? "minus" : ""}" title="Pontos no último episódio">${signed(c.delta)}</span>` : ""}</div>
+            <div class="sub-line">${c.pins ? pinsHtml(c.pins) : ""}<span title="Vitórias em equipe e duelos (VDP, VLE, VE, VD)">${c.teamWins} vit. equipe</span></div>
+          </td>
+          ${shown.map((_, wi) => weekCell(c, wi)).join("")}
         </tr>`).join("")}</tbody>`;
 
     const used = new Set(model.comps.flatMap((c) => c.results));
@@ -383,6 +377,16 @@
       .sort((a, b) => b.pts - a.pts)
       .map((s) => `<span class="item"><span class="code ${codeClass(s.code)} ${s.code === "V" ? "win" : ""}">${esc(s.code)}</span>${esc(s.label.toLowerCase())} (${signed(s.pts)})</span>`).join("")
       + `<span class="item"><span class="code c-none">·</span>não disputou</span><span class="item"><span class="code c-gone"></span>fora</span>`;
+
+    // abre mostrando o episódio mais recente
+    const wrap = $("#scoreWrap");
+    if (!wrap.dataset.bound) {
+      wrap.dataset.bound = "1";
+      ["wheel", "pointerdown", "touchstart", "keydown"].forEach((ev) => wrap.addEventListener(ev, () => (wrap.dataset.user = "1"), { passive: true }));
+    }
+    const toEnd = () => { if (!wrap.dataset.user) wrap.scrollLeft = wrap.scrollWidth; };
+    requestAnimationFrame(toEnd);
+    if (document.fonts) document.fonts.ready.then(toEnd);
   }
 
   /* ---------------- charts ---------------- */
@@ -832,7 +836,7 @@
     }
     model = compute(data);
     runSim();
-    renderHeader(); renderPodium(); renderWeekCard(); renderRanking(); renderBoard();
+    renderHeader(); renderPodium(); renderWeekCard(); renderRanking();
     renderPredTable(); renderRules(); renderEdit(); renderEditions();
     renderVisibleCharts();
   }
@@ -903,7 +907,7 @@
     bind.showTab = showTab;
     bind.goTab = goTab;
 
-    $("#onlyActive").addEventListener("change", () => { renderRanking(); renderBoard(); });
+    $("#onlyActive").addEventListener("change", () => { renderRanking(); });
     $$(".seg [data-evo]").forEach((b) => b.addEventListener("click", () => {
       evoMode = b.dataset.evo;
       $$(".seg [data-evo]").forEach((x) => x.setAttribute("aria-pressed", String(x === b)));
