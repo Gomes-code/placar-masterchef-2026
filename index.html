@@ -4,26 +4,44 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>Placar MasterChef 2026</title>
+<meta name="description" content="Classificação, evolução e previsões do MasterChef 2026">
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24'%3E%3Cg fill='none' stroke='%23e0a526' stroke-width='2' stroke-linecap='round'%3E%3Ccircle cx='12' cy='13' r='9'/%3E%3Cpath d='M8 16.5v-4a2 2 0 0 1 4 0v4m0-4a2 2 0 0 1 4 0v3.2c0 .9.6 1.1 1.2.6'/%3E%3C/g%3E%3C/svg%3E">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-<link href="https://fonts.googleapis.com/css2?family=DM+Serif+Display&family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Plus+Jakarta+Sans:wght@600;700;800&display=swap" rel="stylesheet">
 <link rel="stylesheet" href="styles.css">
 </head>
 <body>
+
+<!-- ícone do pin (vitória individual), definido uma vez e reutilizado -->
+<svg width="0" height="0" style="position:absolute" aria-hidden="true">
+  <defs>
+    <linearGradient id="pinGold" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0" stop-color="#f6c75a"/><stop offset=".55" stop-color="#e0a526"/><stop offset="1" stop-color="#b87d0e"/>
+    </linearGradient>
+    <symbol id="pin" viewBox="0 0 24 24">
+      <g fill="none" stroke="url(#pinGold)" stroke-linecap="round" stroke-linejoin="round">
+        <circle cx="12" cy="2.6" r="1.3" stroke-width="1.2"/>
+        <path d="M12 4a9.4 9.4 0 1 1-6.8 16.3" stroke-width="1.9"/>
+        <path d="M5.2 20.3 11 21.6" stroke-width="1.9"/>
+        <path d="M17.6 10A6.3 6.3 0 1 0 12 19.6" stroke-width="1.6"/>
+        <path d="M8.6 16.2v-3.6a1.7 1.7 0 0 1 3.4 0v3.6m0-3.6a1.7 1.7 0 0 1 3.4 0v2.9c0 .8.5 1 1 .6" stroke-width="1.6"/>
+      </g>
+    </symbol>
+  </defs>
+</svg>
+
 <header class="topbar">
   <div class="brand">
-    <span class="brand-mark" aria-hidden="true">
-      <svg viewBox="0 0 24 24" width="22" height="22"><path fill="currentColor" d="M12 3a4.5 4.5 0 0 0-4.3 3.2A4 4 0 0 0 6 14v5a2 2 0 0 0 2 2h8a2 2 0 0 0 2-2v-5a4 4 0 0 0-1.7-7.8A4.5 4.5 0 0 0 12 3Zm-4 13h8v3H8v-3Z"/></svg>
-    </span>
+    <svg class="brand-pin" aria-hidden="true"><use href="#pin"/></svg>
     <div>
       <h1>Placar MasterChef 2026</h1>
       <p class="sub" id="subtitle">—</p>
     </div>
   </div>
-  <nav class="tabs" role="tablist">
-    <button role="tab" data-tab="classificacao" aria-selected="true">Classificação</button>
-    <button role="tab" data-tab="evolucao">Evolução</button>
-    <button role="tab" data-tab="previsoes">Previsões</button>
+  <nav class="tabs" role="tablist" aria-label="Seções">
+    <button role="tab" data-tab="placar" aria-selected="true">Placar</button>
+    <button role="tab" data-tab="estatisticas">Estatísticas</button>
     <button role="tab" data-tab="lancar">Lançar resultados</button>
     <button role="tab" data-tab="regras">Regras</button>
   </nav>
@@ -33,52 +51,55 @@
 </header>
 
 <main>
-  <!-- CLASSIFICAÇÃO -->
-  <section class="panel" id="tab-classificacao">
-    <div class="kpis" id="kpis"></div>
-
-    <div class="card">
-      <div class="card-head">
-        <h2>Classificação geral</h2>
-        <label class="toggle"><input type="checkbox" id="onlyActive"> Só quem está na disputa</label>
-      </div>
-      <div class="table-wrap">
-        <table class="rank" id="rankTable"></table>
-      </div>
+  <!-- PLACAR -->
+  <section class="panel" id="tab-placar">
+    <div class="hero">
+      <div class="podium" id="podium"></div>
+      <div class="card week-card" id="weekCard"></div>
     </div>
 
     <div class="card">
       <div class="card-head">
-        <h2>Quadro de provas</h2>
-        <p class="hint">Cada célula mostra o resultado na prova. A cor segue os pontos: azul soma, vermelho tira.</p>
+        <div>
+          <h2>Classificação</h2>
+          <p class="hint">Posição geral depois de cada episódio. Passe o mouse para ver os pontos.</p>
+        </div>
+        <label class="switch"><input type="checkbox" id="onlyActive"><span></span> Só quem está na disputa</label>
       </div>
-      <div class="table-wrap">
-        <table class="grid" id="boardTable"></table>
+      <div class="table-wrap"><table class="rank" id="rankTable"></table></div>
+    </div>
+
+    <div class="card">
+      <div class="card-head">
+        <div>
+          <h2>Evolução</h2>
+          <p class="hint" id="evoHint">Posição de quem está na disputa, episódio a episódio.</p>
+        </div>
+        <div class="head-tools">
+          <label class="switch" id="showEliminatedWrap" hidden><input type="checkbox" id="showEliminated"><span></span> Eliminados</label>
+          <div class="seg" role="group" aria-label="Tipo de gráfico">
+            <button data-evo="rank" aria-pressed="true">Posição</button>
+            <button data-evo="cum" aria-pressed="false">Pontos acumulados</button>
+          </div>
+        </div>
       </div>
+      <div class="chart-box tall"><canvas id="evoChart"></canvas></div>
+    </div>
+
+    <div class="card">
+      <div class="card-head">
+        <div>
+          <h2>Resultados por prova</h2>
+          <p class="hint">A cor segue os pontos: azul soma, vermelho tira. Borda dourada = pin.</p>
+        </div>
+      </div>
+      <div class="table-wrap"><table class="grid" id="boardTable"></table></div>
       <div class="legend-codes" id="codeLegend"></div>
     </div>
   </section>
 
-  <!-- EVOLUÇÃO -->
-  <section class="panel" id="tab-evolucao" hidden>
-    <div class="card">
-      <div class="card-head">
-        <h2>Pontuação acumulada por semana</h2>
-        <label class="toggle"><input type="checkbox" id="showEliminated" checked> Mostrar eliminados</label>
-      </div>
-      <div class="chart-box tall"><canvas id="cumChart"></canvas></div>
-    </div>
-    <div class="card">
-      <div class="card-head">
-        <h2>Posição na classificação por semana</h2>
-        <p class="hint">Quem está na disputa. 1º lugar no topo.</p>
-      </div>
-      <div class="chart-box"><canvas id="rankChart"></canvas></div>
-    </div>
-  </section>
-
-  <!-- PREVISÕES -->
-  <section class="panel" id="tab-previsoes" hidden>
+  <!-- ESTATÍSTICAS -->
+  <section class="panel" id="tab-estatisticas" hidden>
     <div class="card controls">
       <div class="control">
         <label for="momentum">Peso da fase recente <output id="momentumOut">50%</output></label>
@@ -96,15 +117,13 @@
     <div class="pred-grid">
       <div class="card">
         <div class="card-head">
-          <h2>Chance de vencer</h2>
-          <p class="hint" id="predHint"></p>
+          <div><h2>Chance de vencer</h2><p class="hint" id="predHint"></p></div>
         </div>
         <div class="chart-box"><canvas id="probChart"></canvas></div>
       </div>
       <div class="card">
         <div class="card-head">
-          <h2>Desempenho × consistência</h2>
-          <p class="hint">Tamanho do ponto = pins. Canto superior direito = favorito.</p>
+          <div><h2>Desempenho × consistência</h2><p class="hint">Tamanho do ponto = pins. Mais acima e à direita = mais forte.</p></div>
         </div>
         <div class="chart-box"><canvas id="scatterChart"></canvas></div>
       </div>
@@ -112,14 +131,14 @@
 
     <div class="card">
       <div class="card-head"><h2>Detalhe do modelo</h2></div>
-      <div class="table-wrap"><table class="rank" id="predTable"></table></div>
+      <div class="table-wrap"><table class="rank plain" id="predTable"></table></div>
       <details class="method">
         <summary>Como a previsão é calculada</summary>
         <ol>
           <li><b>Pontos por semana</b>: soma das duas provas da semana (semanas sem participação, como a repescagem para quem não foi eliminado, ficam de fora).</li>
           <li><b>Desempenho esperado</b>: mistura da média da temporada com a média recente (pesos decrescentes para semanas antigas). O controle “peso da fase recente” define a mistura.</li>
           <li><b>Oscilação</b>: desvio padrão dos pontos semanais. Quem oscila muito tem mais chance de ter uma semana ruim.</li>
-          <li><b>Consistência</b>: % das provas disputadas fora da zona de risco (sem PE, P, PP, ED, DE, DLE).</li>
+          <li><b>Consistência</b>: % das provas disputadas fora da zona de risco (sem PE, P, PP, ED, DE, DLE, E).</li>
           <li><b>Simulação (Monte Carlo)</b>: a cada rodada, cada participante tira uma nota aleatória em torno do seu desempenho esperado, com a sua oscilação. O menor sai. Repete até sobrar um. A chance de vencer é a fração de simulações em que a pessoa sobra.</li>
         </ol>
         <p>É um modelo estatístico simples: não sabe quais provas virão nem quem os jurados preferem. Serve para comparar, não para cravar.</p>
@@ -131,28 +150,33 @@
   <section class="panel" id="tab-lancar" hidden>
     <div class="card">
       <div class="card-head">
-        <h2>Lançar resultados</h2>
-        <p class="hint">Escolha o código em cada prova. As mudanças ficam salvas neste navegador e atualizam todas as telas.</p>
+        <div>
+          <h2>Lançar resultados</h2>
+          <p class="hint">Escolha o episódio, clique na célula e selecione o resultado. Tudo é recalculado na hora.</p>
+        </div>
+      </div>
+      <div class="week-picker" id="weekPicker" role="group" aria-label="Episódio"></div>
+      <div class="edit-head" id="editHead"></div>
+      <div class="table-wrap"><table class="grid edit" id="editTable"></table></div>
+      <label class="switch" style="margin-top:14px"><input type="checkbox" id="editShowOut"><span></span> Mostrar eliminados</label>
+    </div>
+
+    <div class="card">
+      <div class="card-head">
+        <div>
+          <h2>Publicar e arquivos</h2>
+          <p class="hint">O que você lança aqui fica salvo só neste navegador. Para aparecer no site, baixe o <b>data.js</b>, substitua o arquivo no projeto e faça o commit, ou use a planilha com o <b>publicar.bat</b>.</p>
+        </div>
       </div>
       <div class="actions">
-        <label class="btn">
-          Importar planilha (.xlsx)
-          <input type="file" id="xlsxInput" accept=".xlsx,.xlsm,.xls" hidden>
-        </label>
-        <button class="btn ghost" id="exportDataJs" title="Substitua o data.js do projeto por este arquivo e publique">Baixar data.js (para publicar)</button>
-        <button class="btn ghost" id="exportJson">Exportar dados (.json)</button>
-        <label class="btn ghost">
-          Importar dados (.json)
-          <input type="file" id="jsonInput" accept=".json" hidden>
-        </label>
+        <button class="btn" id="exportDataJs">Baixar data.js (para publicar)</button>
+        <label class="btn ghost">Importar planilha (.xlsx)<input type="file" id="xlsxInput" accept=".xlsx,.xlsm,.xls" hidden></label>
+        <button class="btn ghost" id="exportJson">Exportar .json</button>
+        <label class="btn ghost">Importar .json<input type="file" id="jsonInput" accept=".json" hidden></label>
         <button class="btn ghost" id="addCompetitor">Adicionar competidor</button>
-        <button class="btn danger" id="resetData">Voltar aos dados da planilha</button>
+        <button class="btn danger" id="resetData">Descartar alterações</button>
         <span class="status-msg" id="statusMsg" role="status"></span>
       </div>
-      <div class="table-wrap">
-        <table class="grid edit" id="editTable"></table>
-      </div>
-      <p class="hint">“0” = não disputou a prova · “–” = fora da competição.</p>
     </div>
   </section>
 
@@ -160,14 +184,17 @@
   <section class="panel" id="tab-regras" hidden>
     <div class="card narrow">
       <div class="card-head">
-        <h2>Tabela de pontuação</h2>
-        <p class="hint">Pins = vitórias individuais (código V). Vitórias em equipe = VDP + VLE + VE + VD. A pontuação total nunca fica abaixo de 0.</p>
+        <div>
+          <h2>Tabela de pontuação</h2>
+          <p class="hint">Pin = vitória individual (código V). Vitórias em equipe = VDP + VLE + VE + VD. A pontuação total nunca fica abaixo de 0. Desempate: pontos, pins, vitórias em equipe.</p>
+        </div>
       </div>
-      <table class="rank" id="rulesTable"></table>
+      <table class="rank plain" id="rulesTable"></table>
     </div>
   </section>
 </main>
 
+<div class="picker" id="picker" hidden role="dialog" aria-label="Escolher resultado"></div>
 <div class="tooltip" id="tooltip" hidden></div>
 
 <script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.min.js"></script>
