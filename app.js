@@ -1,8 +1,8 @@
-/* Placar MasterChef 2026 — lógica do app (sem build, roda direto no navegador). */
+/* Placar MasterChef — lógica do app (várias edições; sem build, roda direto no navegador). */
 (() => {
   "use strict";
 
-  const STORAGE_KEY = "mc2026-data-v2";
+  const STORAGE_KEY = "mc-placar-edicoes-v3";
   const THEME_KEY = "mc2026-theme";
   const TEAM_WIN = new Set(["VDP", "VLE", "VE", "VD"]);
   const RISK = new Set(["PE", "P", "PP", "ED", "DE", "DLE", "E"]);
@@ -22,11 +22,24 @@
     del(k) { try { localStorage.removeItem(k); } catch { /* idem */ } },
   };
 
-  /* ---------------- estado ---------------- */
+  /* ---------------- estado (várias edições) ----------------
+   * Publicado = window.MASTERCHEF_EDITIONS (data.js).
+   * Local (localStorage) = edições alteradas ou criadas neste navegador. Cada alteração guarda a
+   * impressão digital da versão publicada em que se baseou; se o data.js publicado mudar, a cópia
+   * local daquela edição é descartada. Edições criadas aqui (sem versão publicada) são mantidas.
+   */
   const clone = (o) => JSON.parse(JSON.stringify(o));
-  // impressão digital do data.js publicado: se mudar, edições locais antigas são descartadas
-  const BASE_ID = (() => { const t = JSON.stringify(window.MASTERCHEF_DATA); let h = 0; for (let i = 0; i < t.length; i++) h = (h * 31 + t.charCodeAt(i)) | 0; return String(h); })();
-  let data = loadData();
+  const hash = (o) => { const t = JSON.stringify(o); let h = 0; for (let i = 0; i < t.length; i++) h = (h * 31 + t.charCodeAt(i)) | 0; return String(h); };
+  const published = (() => {
+    const raw = window.MASTERCHEF_EDITIONS
+      || (window.MASTERCHEF_DATA && { default: "masterchef-2026", editions: [{ id: "masterchef-2026", title: "MasterChef 2026", ...window.MASTERCHEF_DATA }] })
+      || { default: null, editions: [] };
+    const eds = raw.editions.map((e) => normalize(clone(e)));
+    return { default: raw.default, editions: eds, hashes: Object.fromEntries(raw.editions.map((e) => [e.id, hash(e)])) };
+  })();
+  let local = loadLocal();
+  let editions = mergeEditions();
+  let data = null; // edição aberta
   let model = null;
   let sim = null;
   const charts = {};
@@ -34,17 +47,33 @@
   let evoMode = "rank";
   let editWeek = null; // índice da semana em edição, ou "all"
 
-  function loadData() {
-    const saved = store.get(STORAGE_KEY);
-    if (saved) {
-      try {
-        const s = JSON.parse(saved);
-        if (s.base === BASE_ID && s.data) return normalize(s.data);
-        store.del(STORAGE_KEY);
-      } catch { /* cai para o padrão */ }
-    }
-    return normalize(clone(window.MASTERCHEF_DATA));
+  function loadLocal() {
+    const empty = { eds: {}, deleted: [], order: [], default: null, current: null };
+    try {
+      const s = JSON.parse(store.get(STORAGE_KEY) || "null");
+      if (!s || !s.eds) return empty;
+      for (const [id, entry] of Object.entries(s.eds)) {
+        const pubHash = published.hashes[id] || null;
+        if (entry.base !== pubHash) delete s.eds[id]; // versão publicada mudou (ou foi removida)
+      }
+      s.deleted = (s.deleted || []).filter((d) => published.hashes[d.id] === d.base);
+      return { ...empty, ...s };
+    } catch { return empty; }
   }
+  function saveLocal() { store.set(STORAGE_KEY, JSON.stringify(local)); }
+  function mergeEditions() {
+    const del = new Set(local.deleted.map((d) => d.id));
+    const list = published.editions.filter((e) => !del.has(e.id)).map((e) => (local.eds[e.id] ? normalize(clone(local.eds[e.id].data)) : e));
+    Object.values(local.eds).forEach((entry) => { if (entry.base === null && !list.some((e) => e.id === entry.data.id)) list.push(normalize(clone(entry.data))); });
+    return list;
+  }
+  const defaultId = () => {
+    const ids = editions.map((e) => e.id);
+    if (local.default && ids.includes(local.default)) return local.default;
+    if (published.default && ids.includes(published.default)) return published.default;
+    return ids[ids.length - 1] || null;
+  };
+  const edStatus = (id) => (local.eds[id] ? (local.eds[id].base === null ? "local" : "changed") : "published");
   function normalize(d) {
     const slots = d.weeks.length * 2;
     d.competitors.forEach((c) => {
@@ -55,7 +84,25 @@
     });
     return d;
   }
-  function save() { store.set(STORAGE_KEY, JSON.stringify({ base: BASE_ID, data })); }
+  // grava a edição aberta como alteração local
+  function save() {
+    if (!data) return;
+    local.eds[data.id] = { base: published.hashes[data.id] || null, data };
+    saveLocal();
+  }
+  function openEdition(id) {
+    const ed = editions.find((e) => e.id === id) || editions.find((e) => e.id === defaultId()) || editions[0] || null;
+    data = ed; editWeek = null;
+    local.current = ed ? ed.id : null; saveLocal();
+    const url = new URL(location.href);
+    if (ed && ed.id !== defaultId()) url.searchParams.set("edicao", ed.id); else url.searchParams.delete("edicao");
+    history.replaceState(null, "", url);
+  }
+  const slugify = (t) => t.normalize("NFKD").replace(/[̀-ͯ]/g, "").toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/^-|-$/g, "") || "edicao";
+  const uniqueId = (title) => { const base = slugify(title); let id = base, n = 2; while (editions.some((e) => e.id === id)) id = `${base}-${n++}`; return id; };
+  function bundleForExport() {
+    return { default: defaultId(), editions: editions.map((e) => clone(e)) };
+  }
 
   /* ---------------- modelo ---------------- */
   function compute(d) {
@@ -211,13 +258,26 @@
 
   /* ---------------- render: topo ---------------- */
   function renderHeader() {
+    const sel = $("#editionSelect");
+    sel.innerHTML = editions.map((e) => `<option value="${esc(e.id)}"${data && e.id === data.id ? " selected" : ""}>${esc(e.title)}</option>`).join("");
+    $("#edTitle").textContent = "Placar";
+    document.title = data ? `Placar ${data.title}` : "Placar MasterChef";
+    if (!data) { $("#subtitle").textContent = "Nenhuma edição cadastrada"; return; }
     const w = model.currentWeek;
-    const wl = w >= 0 ? data.weeks[w].label : "sem resultados";
-    $("#subtitle").textContent = `${model.active.length} na disputa · atualizado até ${wl.toLowerCase()}`;
+    $("#subtitle").textContent = w >= 0
+      ? `${model.active.length} na disputa · atualizado até ${data.weeks[w].label.toLowerCase()}`
+      : `${data.competitors.length} participantes · ainda sem resultados`;
   }
 
   /* ---------------- render: pódio + semana ---------------- */
   function renderPodium() {
+    if (model.currentWeek < 0) {
+      $("#podium").innerHTML = `<div class="card empty-state" style="grid-column:1/-1">
+        <h3>${esc(data.title)} ainda não começou</h3>
+        <p>${data.competitors.length ? `${data.competitors.length} participantes cadastrados. Lance o primeiro episódio para o placar aparecer.` : "Cadastre os participantes na aba Edições."}</p>
+        <button class="btn" data-goto="${data.competitors.length ? "lancar" : "edicoes"}">${data.competitors.length ? "Lançar o 1º episódio" : "Cadastrar participantes"}</button></div>`;
+      return;
+    }
     const top = model.sorted.filter((c) => !c.eliminated).slice(0, 3);
     const leader = top[0];
     const order = [top[1], top[0], top[2]]; // 2º · 1º · 3º como num pódio
@@ -285,7 +345,7 @@
       </tr></thead>
       <tbody>${rows.map((c) => `
         <tr class="${c.eliminated ? "out" : ""}">
-          <td class="pos ${c.pos <= 3 && !c.eliminated ? "top" : ""} num">${c.pos}º</td>
+          <td class="pos ${w >= 0 && c.pos <= 3 && !c.eliminated ? "top" : ""} num">${w >= 0 ? c.pos + "º" : "–"}</td>
           <td>${move(c)}</td>
           <td><div class="who">${avatar(c)}<div><div class="nm">${esc(c.name)}</div><div class="st ${statusClass(c)}">${statusText(c)}</div></div></div></td>
           <td class="r"><span class="pts-big num">${fmt(c.total)}</span>
@@ -366,7 +426,8 @@
 
   function renderEvo() {
     destroy("evo");
-    const w = model.currentWeek; if (w < 0) return;
+    const w = model.currentWeek;
+    if (w < 0) { $("#evoHint").textContent = "O gráfico aparece depois do 1º episódio lançado."; return; }
     const labels = data.weeks.slice(0, w + 1).map((x) => shortWeek(x.label));
     const title = (it) => data.weeks[it[0].dataIndex].label;
     const line = (c, values, muted) => ({
@@ -454,7 +515,7 @@
         },
       },
     });
-    $("#predHint").textContent = `${fmt(sim.runs)} temporadas simuladas a partir de ${data.weeks[model.currentWeek]?.label || "—"}`;
+    $("#predHint").textContent = model.currentWeek >= 0 ? `${fmt(sim.runs)} temporadas simuladas a partir de ${data.weeks[model.currentWeek].label}` : "Sem resultados ainda: por enquanto, todos têm a mesma chance.";
   }
 
   function renderScatter() {
@@ -651,6 +712,107 @@
         <td class="r"><input class="input num" type="number" data-rule="${esc(s.code)}" value="${s.pts}" style="min-width:0;width:74px;text-align:right" aria-label="Pontos de ${esc(s.code)}"></td></tr>`).join("")}</tbody>`;
   }
 
+  /* ---------------- edições: painel ---------------- */
+  const DEFAULT_SCORING = [
+    ["V", "VITÓRIA INDIVIDUAL", 10], ["VDP", "VITÓRIA EMPATE", 10], ["VR", "VENCEU A REPESCAGEM", 10],
+    ["VD", "VITÓRIA EM DUELO", 9], ["VLE", "VITÓRIA LÍDER DE EQUIPE", 9], ["VE", "VITÓRIA EM EQUIPE", 8],
+    ["M", "MELHORES", 7], ["VP", "VITÓRIA EM PROVA DE PRESSÃO", 6], ["S", "SALVO", 5], ["PS", "PODER DE SALVAR", 5],
+    ["DS", "DUPLA SALVA", 5], ["P", "PIORES", 4], ["E", "ELIMINADO", 0], ["D", "DESISTÊNCIA", 0], ["I", "IMUNE", 0],
+    ["PP", "PROVA DE PRESSÃO", -1], ["PE", "PROVA DE ELIMINAÇÃO", -1], ["DE", "DERROTA EM EQUIPE", -1],
+    ["ED", "ELIMINAÇÃO DIRETA", -2], ["DLE", "DERROTA LÍDER EQUIPE", -2],
+  ].map(([code, label, pts]) => ({ code, label, pts }));
+  const weekLabel = (n) => `Semana ${String(n).padStart(2, "0")}`;
+  const titleFromFile = (name) => name.replace(/\.[^.]+$/, "").replace(/^\s*tabela\s+/i, "").trim().toLowerCase()
+    .replace(/(^|\s)\S/g, (m) => m.toUpperCase()).replace(/masterchef/i, "MasterChef");
+
+  function addEdition(ed) {
+    ed.id = uniqueId(ed.title);
+    local.eds[ed.id] = { base: null, data: ed };
+    saveLocal();
+    editions = mergeEditions();
+    openEdition(ed.id);
+  }
+
+  function renderEditions() {
+    const def = defaultId();
+    const rows = editions.map((e) => {
+      const m = e === data ? model : compute(e);
+      const w = m.currentWeek;
+      const leader = w >= 0 ? m.sorted.find((c) => !c.eliminated) : null;
+      const st = edStatus(e.id);
+      const isOpen = data && e.id === data.id;
+      const badges = [
+        e.id === def ? '<span class="badge gold">padrão do site</span>' : "",
+        isOpen ? '<span class="badge cur">aberta</span>' : "",
+        st === "local" ? '<span class="badge warn" title="Baixe o data.js e publique para aparecer no site">só neste navegador</span>' : "",
+        st === "changed" ? '<span class="badge warn" title="Baixe o data.js e publique para aparecer no site">alterada neste navegador</span>' : "",
+      ].join("");
+      return `<tr>
+        <td><b>${esc(e.title)}</b>${badges}</td>
+        <td class="c num">${e.competitors.length}</td>
+        <td class="c num">${w + 1} / ${e.weeks.length}</td>
+        <td>${leader ? `${esc(leader.name)} · ${fmt(leader.total)} pts` : '<span class="dash">—</span>'}</td>
+        <td><div class="row-actions">
+          ${isOpen ? "" : `<button class="btn sm" data-ed-open="${esc(e.id)}">Abrir</button>`}
+          ${e.id === def ? "" : `<button class="btn ghost sm" data-ed-default="${esc(e.id)}">Tornar padrão</button>`}
+          <button class="btn ghost sm" data-ed-xlsx="${esc(e.id)}">Planilha</button>
+          <button class="btn danger sm" data-ed-del="${esc(e.id)}">Excluir</button>
+        </div></td>
+      </tr>`;
+    }).join("");
+    $("#editionsTable").innerHTML = `
+      <thead><tr><th>Edição</th><th class="c">Participantes</th><th class="c">Episódios</th><th>Líder</th><th class="r">Ações</th></tr></thead>
+      <tbody>${rows || '<tr><td colspan="5" class="empty-state">Nenhuma edição ainda. Crie a primeira abaixo.</td></tr>'}</tbody>`;
+
+    const sc = $("#neScoring"), keep = sc.value;
+    sc.innerHTML = editions.map((e) => `<option value="${esc(e.id)}">Copiar de ${esc(e.title)}</option>`).join("") + '<option value="__default">Tabela padrão</option>';
+    if ([...sc.options].some((o) => o.value === keep)) sc.value = keep; else if (data) sc.value = data.id;
+
+    $("#peopleEdTitle").textContent = data ? data.title : "—";
+    $("#addPersonForm").hidden = !data;
+    $("#weeksCount").textContent = data ? data.weeks.length : 0;
+    $("#addWeek").disabled = $("#removeWeek").disabled = !data;
+    $("#peopleList").innerHTML = !data ? '<li class="empty">Abra ou crie uma edição.</li>'
+      : !data.competitors.length ? '<li class="empty">Nenhum participante ainda.</li>'
+      : data.competitors.map((c, ci) => {
+        const m = model.comps[ci];
+        return `<li>${avatar(m)}<input data-person="${ci}" value="${esc(c.name)}" aria-label="Nome">
+          <span class="st">${m.provasPlayed ? `${fmt(m.total)} pts` : "sem resultados"}</span>
+          <button class="del-btn" data-person-del="${ci}" title="Remover ${esc(c.name)}" aria-label="Remover ${esc(c.name)}">×</button></li>`;
+      }).join("");
+    const btn = $("#resetData");
+    const st = data ? edStatus(data.id) : "published";
+    btn.disabled = st !== "changed";
+    btn.title = st === "local" ? "Edição criada neste navegador: não há versão publicada para voltar" : st === "published" ? "Nada alterado nesta edição" : "";
+  }
+
+  /* planilha no mesmo formato da aba Placar original (o importador e o publicar.bat leem de volta) */
+  function exportXlsx(ed) {
+    if (typeof XLSX === "undefined") { flash("Gerador de planilhas não carregou (sem internet?)."); return; }
+    const m = compute(ed);
+    const nW = ed.weeks.length, first = 7; // coluna H
+    const rows = [[], []];
+    rows[0][0] = "PLACAR"; rows[1][0] = "POSIÇÃO"; rows[1][2] = "COMPETIDORES"; rows[1][4] = "PINS"; rows[1][5] = "PONT."; rows[1][6] = "VIT. EQP.";
+    ed.weeks.forEach((w, i) => {
+      rows[0][first + 2 * i] = i === 0 ? "SEMANA 01" : w.label.toUpperCase(); // o importador procura "SEMANA 01"
+      rows[1][first + 2 * i] = (w.provas[0] || "").toUpperCase();
+      rows[1][first + 2 * i + 1] = (w.provas[1] || "").toUpperCase();
+    });
+    m.sorted.forEach((c, r) => {
+      const row = (rows[r + 2] = rows[r + 2] || []);
+      row[0] = c.pos; row[3] = c.name; row[4] = c.pins; row[5] = c.total; row[6] = c.teamWins;
+      c.results.forEach((k, i) => (row[first + i] = k === "0" ? 0 : k));
+    });
+    const tc = first + 2 * nW + 2; // tabela de pontuação ao lado
+    rows[0][tc] = "TABELA DE PONTUAÇÕES";
+    ed.scoring.forEach((s, i) => { const row = (rows[i + 1] = rows[i + 1] || []); row[tc] = s.label; row[tc + 3] = s.code; row[tc + 4] = s.pts; });
+    const ws = XLSX.utils.aoa_to_sheet(rows);
+    ws["!cols"] = Array.from({ length: tc + 5 }, (_, i) => ({ wch: i === 3 ? 16 : i >= first && i < first + 2 * nW ? 7 : i === tc ? 30 : 6 }));
+    const wb = XLSX.utils.book_new();
+    XLSX.utils.book_append_sheet(wb, ws, "Placar");
+    XLSX.writeFile(wb, `TABELA ${ed.title.toUpperCase()}.xlsx`);
+  }
+
   /* ---------------- orquestração ---------------- */
   function runSim() { sim = simulate(model, Number($("#momentum").value) / 100, Number($("#sims").value)); }
 
@@ -661,16 +823,23 @@
   }
 
   function refresh() {
+    const none = !data;
+    $$(".tabs button").forEach((b) => { if (b.dataset.tab !== "edicoes") b.disabled = none; });
+    if (none) {
+      renderHeader(); renderEditions();
+      if (activeTab !== "edicoes") bind.showTab("edicoes");
+      return;
+    }
     model = compute(data);
     runSim();
     renderHeader(); renderPodium(); renderWeekCard(); renderRanking(); renderBoard();
-    renderPredTable(); renderRules(); renderEdit();
+    renderPredTable(); renderRules(); renderEdit(); renderEditions();
     renderVisibleCharts();
   }
 
   function flash(msg) {
-    const el = $("#statusMsg"); el.textContent = msg;
-    clearTimeout(flash.t); flash.t = setTimeout(() => (el.textContent = ""), 6000);
+    const els = $$("#statusMsg, #neMsg"); els.forEach((el) => (el.textContent = msg));
+    clearTimeout(flash.t); flash.t = setTimeout(() => els.forEach((el) => (el.textContent = "")), 6000);
   }
 
   /* ---------------- importação da planilha ---------------- */
@@ -701,7 +870,7 @@
       }
       competitors.push({ name: nm.trim(), results });
     }
-    let scoring = data.scoring;
+    let scoring = clone((data && data.scoring) || DEFAULT_SCORING);
     const tab = find(/TABELA DE PONTUA/i);
     if (tab) {
       const list = [];
@@ -732,6 +901,7 @@
     addEventListener("hashchange", () => showTab(location.hash.slice(1)));
     document.addEventListener("click", (e) => { const g = e.target.closest("[data-goto]"); if (g) goTab(g.dataset.goto); });
     bind.showTab = showTab;
+    bind.goTab = goTab;
 
     $("#onlyActive").addEventListener("change", () => { renderRanking(); renderBoard(); });
     $$(".seg [data-evo]").forEach((b) => b.addEventListener("click", () => {
@@ -793,10 +963,6 @@
     });
     addEventListener("resize", closePicker);
 
-    $("#addCompetitor").addEventListener("click", () => {
-      data.competitors.push({ name: "Novo competidor", results: Array(data.weeks.length * 2).fill("0") });
-      editWeek = "all"; save(); refresh(); flash("Competidor adicionado no fim da tabela (visão “Todas”). Clique no nome para renomear.");
-    });
     $("#rulesTable").addEventListener("change", (e) => {
       const t = e.target; if (!t.matches("[data-rule]")) return;
       const s = data.scoring.find((x) => x.code === t.dataset.rule);
@@ -809,32 +975,118 @@
       link.click(); URL.revokeObjectURL(link.href);
     };
     $("#exportDataJs").addEventListener("click", () => {
-      download("data.js", "// Exportado pelo app (Lançar resultados).\nwindow.MASTERCHEF_DATA = " + JSON.stringify(data, null, 1) + ";\n", "text/javascript");
-      flash("data.js baixado: substitua o arquivo na pasta do projeto e faça o commit.");
+      download("data.js", "// Exportado pelo app. Todas as edições do placar.\nwindow.MASTERCHEF_EDITIONS = " + JSON.stringify(bundleForExport(), null, 1) + ";\n", "text/javascript");
+      flash("data.js baixado (todas as edições): substitua o arquivo na pasta do projeto e faça o commit.");
     });
-    $("#exportJson").addEventListener("click", () => download("masterchef-2026.json", JSON.stringify(data, null, 1), "application/json"));
+    $("#exportJson").addEventListener("click", () => download("placar-edicoes.json", JSON.stringify(bundleForExport(), null, 1), "application/json"));
+    $("#exportXlsx").addEventListener("click", () => data && exportXlsx(data));
+    const readXlsx = async (f) => {
+      if (typeof XLSX === "undefined") throw new Error("Leitor de planilhas não carregou (sem internet?).");
+      return parseWorkbook(XLSX.read(await f.arrayBuffer(), { type: "array" }));
+    };
     $("#xlsxInput").addEventListener("change", async (e) => {
       const f = e.target.files[0]; if (!f) return;
       try {
-        if (typeof XLSX === "undefined") throw new Error("Leitor de planilhas não carregou (sem internet?).");
-        const wb = XLSX.read(await f.arrayBuffer(), { type: "array" });
-        data = parseWorkbook(wb); data.source = f.name; editWeek = null;
-        save(); refresh(); flash(`Planilha “${f.name}” importada: ${data.competitors.length} competidores.`);
-      } catch (err) { flash("Erro ao importar: " + err.message); }
-      e.target.value = "";
+        const ed = await readXlsx(f);
+        if (!confirm(`Substituir os resultados de “${data.title}” pelos da planilha “${f.name}”?`)) return;
+        Object.assign(data, { weeks: ed.weeks, scoring: ed.scoring, competitors: ed.competitors, source: f.name });
+        editWeek = null; save(); refresh(); flash(`Planilha “${f.name}” importada: ${data.competitors.length} competidores.`);
+      } catch (err) { flash("Erro ao importar: " + err.message); } finally { e.target.value = ""; }
     });
     $("#jsonInput").addEventListener("change", async (e) => {
       const f = e.target.files[0]; if (!f) return;
       try {
         const d = JSON.parse(await f.text());
-        if (!d.weeks || !d.competitors || !d.scoring) throw new Error("arquivo sem weeks/competitors/scoring");
-        data = normalize(d); editWeek = null; save(); refresh(); flash(`Dados de “${f.name}” carregados.`);
-      } catch (err) { flash("Erro ao ler JSON: " + err.message); }
-      e.target.value = "";
+        const list = d.editions ? d.editions : d.weeks ? [{ id: data ? data.id : "importada", title: data ? data.title : "Importada", ...d }] : null;
+        if (!list) throw new Error("arquivo sem edições");
+        list.forEach((ed) => { normalize(ed); local.eds[ed.id] = { base: published.hashes[ed.id] || null, data: ed }; });
+        if (d.default) local.default = d.default;
+        saveLocal(); editions = mergeEditions(); openEdition(data ? data.id : list[0].id); refresh();
+        flash(`${list.length} edição(ões) carregada(s) de “${f.name}”.`);
+      } catch (err) { flash("Erro ao ler JSON: " + err.message); } finally { e.target.value = ""; }
     });
     $("#resetData").addEventListener("click", () => {
-      if (!confirm("Descartar o que foi lançado neste navegador e voltar aos dados publicados?")) return;
-      store.del(STORAGE_KEY); data = normalize(clone(window.MASTERCHEF_DATA)); editWeek = null; refresh(); flash("Dados publicados restaurados.");
+      if (!data || edStatus(data.id) !== "changed") return;
+      if (!confirm(`Descartar o que foi alterado em “${data.title}” neste navegador e voltar à versão publicada?`)) return;
+      const id = data.id; delete local.eds[id]; saveLocal(); editions = mergeEditions(); openEdition(id); refresh(); flash("Versão publicada restaurada.");
+    });
+
+    // edições
+    $("#editionSelect").addEventListener("change", (e) => { openEdition(e.target.value); refresh(); });
+    $("#editionsTable").addEventListener("click", (e) => {
+      const b = e.target.closest("button"); if (!b) return;
+      if (b.dataset.edOpen) { openEdition(b.dataset.edOpen); refresh(); }
+      else if (b.dataset.edDefault) {
+        local.default = b.dataset.edDefault; saveLocal(); openEdition(data && data.id); refresh();
+        flash("Padrão alterado neste navegador. Baixe o data.js e publique para valer no site.");
+      } else if (b.dataset.edXlsx) exportXlsx(editions.find((x) => x.id === b.dataset.edXlsx));
+      else if (b.dataset.edDel) {
+        const ed = editions.find((x) => x.id === b.dataset.edDel);
+        if (!confirm(`Excluir a edição “${ed.title}”? Os participantes e resultados dela serão apagados deste navegador.`)) return;
+        if (published.hashes[ed.id]) local.deleted.push({ id: ed.id, base: published.hashes[ed.id] });
+        delete local.eds[ed.id];
+        if (local.default === ed.id) local.default = null;
+        saveLocal(); editions = mergeEditions();
+        openEdition(data && data.id !== ed.id ? data.id : defaultId()); refresh();
+        flash(published.hashes[ed.id] ? "Edição excluída neste navegador. Baixe o data.js e publique para remover do site." : "Edição excluída.");
+      }
+    });
+    const nePeople = () => $("#nePeople").value.split(/\r?\n/).map((x) => x.trim()).filter(Boolean);
+    $("#nePeople").addEventListener("input", () => { $("#nePeopleCount").textContent = nePeople().length; });
+    $("#newEditionForm").addEventListener("submit", (e) => {
+      e.preventDefault();
+      const title = $("#neTitle").value.trim();
+      if (!title) return;
+      const n = Math.max(1, Math.min(40, parseInt($("#neWeeks").value, 10) || 15));
+      const src = editions.find((x) => x.id === $("#neScoring").value);
+      const people = [...new Set(nePeople())];
+      addEdition({
+        title, source: "criada no app",
+        weeks: Array.from({ length: n }, (_, i) => ({ label: weekLabel(i + 1), provas: ["", ""] })),
+        scoring: clone(src ? src.scoring : DEFAULT_SCORING),
+        competitors: people.map((name) => ({ name, results: Array(n * 2).fill("0") })),
+      });
+      e.target.reset(); $("#neWeeks").value = 15; $("#nePeopleCount").textContent = "0";
+      refresh();
+      bind.goTab(people.length ? "lancar" : "edicoes");
+      flash(`“${title}” criada. Agora é só lançar os episódios.`);
+    });
+    $("#newFromXlsx").addEventListener("change", async (e) => {
+      const f = e.target.files[0]; if (!f) return;
+      try {
+        const ed = await readXlsx(f);
+        ed.title = titleFromFile(f.name) || "Nova edição"; ed.source = f.name;
+        addEdition(ed); refresh(); bind.goTab("placar");
+      } catch (err) { $("#neMsg").textContent = "Erro ao importar: " + err.message; } finally { e.target.value = ""; }
+    });
+    $("#peopleList").addEventListener("change", (e) => {
+      const t = e.target; if (!t.matches("[data-person]")) return;
+      data.competitors[+t.dataset.person].name = t.value.trim() || "Sem nome"; save(); refresh();
+    });
+    $("#peopleList").addEventListener("click", (e) => {
+      const b = e.target.closest("[data-person-del]"); if (!b) return;
+      const c = data.competitors[+b.dataset.personDel];
+      if (!confirm(`Remover ${c.name} de “${data.title}”? Os resultados dessa pessoa serão apagados.`)) return;
+      data.competitors.splice(+b.dataset.personDel, 1); save(); refresh();
+    });
+    $("#addPersonForm").addEventListener("submit", (e) => {
+      e.preventDefault();
+      const name = $("#addPersonName").value.trim(); if (!name || !data) return;
+      data.competitors.push({ name, results: Array(data.weeks.length * 2).fill("0") });
+      $("#addPersonName").value = ""; save(); refresh(); $("#addPersonName").focus();
+    });
+    $("#addWeek").addEventListener("click", () => {
+      data.weeks.push({ label: weekLabel(data.weeks.length + 1), provas: ["", ""] });
+      data.competitors.forEach((c) => c.results.push("0", "0")); save(); refresh();
+    });
+    $("#removeWeek").addEventListener("click", () => {
+      if (data.weeks.length <= 1) return;
+      const w = data.weeks.length - 1;
+      const used = data.competitors.some((c) => c.results.slice(2 * w).some((k) => k !== "0" && k !== "-"));
+      if (used && !confirm(`${data.weeks[w].label} já tem resultados lançados. Remover mesmo assim?`)) return;
+      data.weeks.pop(); data.competitors.forEach((c) => c.results.splice(2 * w, 2));
+      if (editWeek !== "all" && editWeek >= data.weeks.length) editWeek = null;
+      save(); refresh();
     });
 
     // tema
@@ -871,6 +1123,7 @@
     chartDefaults();
   }
   bind();
+  openEdition(new URL(location.href).searchParams.get("edicao") || defaultId());
   refresh();
   if (location.hash) bind.showTab(location.hash.slice(1));
 })();

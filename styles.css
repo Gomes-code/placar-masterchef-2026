@@ -353,6 +353,56 @@ table.grid.edit input.name-input:hover, table.grid.edit input.name-input:focus {
 }
 .tooltip[hidden] { display: none; }
 
+
+/* ============ edições ============ */
+.sr-only { position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; }
+.brand-text { min-width: 0; }
+.ed-switch { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
+.ed-select { position: relative; display: inline-flex; align-items: center; }
+.ed-select select {
+  appearance: none; -webkit-appearance: none; cursor: pointer;
+  border: 1px solid var(--border); background: var(--surface-1); color: var(--text-primary);
+  font: 700 13px "Plus Jakarta Sans", Inter, sans-serif; padding: 4px 28px 4px 10px; border-radius: 8px; max-width: 220px;
+}
+.ed-select select:hover { border-color: var(--text-muted); }
+.ed-select select option { background: var(--surface-1); color: var(--text-primary); }
+.ed-select svg { position: absolute; right: 8px; pointer-events: none; color: var(--text-secondary); }
+
+.badge { display: inline-flex; align-items: center; gap: 4px; font-size: 11px; font-weight: 600; padding: 2px 8px; border-radius: 999px; background: var(--surface-2); color: var(--text-secondary); margin-left: 6px; vertical-align: middle; }
+.badge.gold { background: var(--accent-soft); color: var(--accent); }
+.badge.warn { background: color-mix(in srgb, var(--series-2) 14%, transparent); color: var(--series-2); }
+.badge.cur { background: var(--text-primary); color: var(--bg); }
+.row-actions { display: flex; gap: 6px; flex-wrap: wrap; justify-content: flex-end; }
+.btn.sm { padding: 5px 10px; font-size: 12px; border-radius: 8px; }
+.btn[disabled] { opacity: .45; cursor: default; }
+
+.ed-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(380px, 1fr)); gap: 20px; align-items: start; }
+.form { display: grid; gap: 14px; }
+.form .field, .row2 .field { display: grid; gap: 5px; }
+.form label { font-size: 11.5px; color: var(--text-muted); font-weight: 600; text-transform: uppercase; letter-spacing: .06em; display: flex; justify-content: space-between; }
+.form .input { min-width: 0; width: 100%; }
+.form .actions label.btn { font-size: 13px; color: var(--text-primary); text-transform: none; letter-spacing: 0; font-weight: 600; }
+.form textarea.input { resize: vertical; font: 500 13.5px/1.6 Inter, sans-serif; }
+.row2 { display: grid; grid-template-columns: 120px minmax(0, 1fr); gap: 12px; }
+.count { color: var(--accent); text-transform: none; letter-spacing: 0; }
+select.input { appearance: auto; cursor: pointer; }
+select.input option { background: var(--surface-1); color: var(--text-primary); }
+
+.people { list-style: none; margin: 0 0 14px; padding: 0; display: grid; gap: 6px; max-height: 460px; overflow: auto; }
+.people li { display: grid; grid-template-columns: auto minmax(0, 1fr) auto auto; gap: 10px; align-items: center; padding: 6px 8px; border-radius: 10px; background: var(--surface-2); }
+.people input { border: 1px solid transparent; background: transparent; color: var(--text-primary); font: 600 13.5px Inter, sans-serif; padding: 5px 7px; border-radius: 7px; width: 100%; min-width: 0; }
+.people input:hover, .people input:focus { border-color: var(--border); background: var(--surface-1); outline: none; }
+.people .st { font-size: 11.5px; color: var(--text-muted); white-space: nowrap; }
+.people .empty { color: var(--text-muted); background: none; }
+.add-person { display: flex; gap: 8px; }
+.add-person .input { flex: 1; min-width: 0; }
+.weeks-ctl { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; margin-top: 16px; padding-top: 16px; border-top: 1px solid var(--grid-line); color: var(--text-secondary); font-size: 13px; }
+.weeks-ctl span { margin-right: auto; }
+
+.empty-state { text-align: center; padding: 36px 16px; color: var(--text-secondary); }
+.empty-state h3 { font-size: 18px; color: var(--text-primary); margin-bottom: 6px; }
+.empty-state .btn { margin-top: 14px; }
+
 /* ============ responsivo ============ */
 @media (max-width: 1080px) {
   .hero { grid-template-columns: minmax(0, 1fr); }
@@ -379,4 +429,6 @@ table.grid.edit input.name-input:hover, table.grid.edit input.name-input:focus {
   .control { min-width: 100%; }
   .input { min-width: 0; width: 100%; }
   .picker { width: min(300px, calc(100vw - 24px)); }
+  .ed-grid { grid-template-columns: minmax(0, 1fr); }
+  .ed-select select { max-width: 170px; }
 }

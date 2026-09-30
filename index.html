@@ -34,8 +34,15 @@
 <header class="topbar">
   <div class="brand">
     <svg class="brand-pin" aria-hidden="true"><use href="#pin"/></svg>
-    <div>
-      <h1>Placar MasterChef 2026</h1>
+    <div class="brand-text">
+      <div class="ed-switch">
+        <h1 id="edTitle">Placar</h1>
+        <label class="ed-select" title="Trocar de edição">
+          <span class="sr-only">Edição</span>
+          <select id="editionSelect"></select>
+          <svg viewBox="0 0 24 24" width="14" height="14" aria-hidden="true"><path fill="currentColor" d="m7 10 5 5 5-5z"/></svg>
+        </label>
+      </div>
       <p class="sub" id="subtitle">—</p>
     </div>
   </div>
@@ -43,6 +50,7 @@
     <button role="tab" data-tab="placar" aria-selected="true">Placar</button>
     <button role="tab" data-tab="estatisticas">Estatísticas</button>
     <button role="tab" data-tab="lancar">Lançar resultados</button>
+    <button role="tab" data-tab="edicoes">Edições</button>
     <button role="tab" data-tab="regras">Regras</button>
   </nav>
   <button class="icon-btn" id="themeToggle" title="Alternar tema claro/escuro" aria-label="Alternar tema">
@@ -165,17 +173,76 @@
       <div class="card-head">
         <div>
           <h2>Publicar e arquivos</h2>
-          <p class="hint">O que você lança aqui fica salvo só neste navegador. Para aparecer no site, baixe o <b>data.js</b>, substitua o arquivo no projeto e faça o commit, ou use a planilha com o <b>publicar.bat</b>.</p>
+          <p class="hint">O que você lança aqui fica salvo só neste navegador. Para aparecer no site, baixe o <b>data.js</b> (ele leva todas as edições), substitua o arquivo no projeto e faça o commit, ou use a planilha com o <b>publicar.bat</b>.</p>
         </div>
       </div>
       <div class="actions">
         <button class="btn" id="exportDataJs">Baixar data.js (para publicar)</button>
-        <label class="btn ghost">Importar planilha (.xlsx)<input type="file" id="xlsxInput" accept=".xlsx,.xlsm,.xls" hidden></label>
+        <label class="btn ghost" title="Substitui os resultados desta edição pelos da planilha">Atualizar com planilha (.xlsx)<input type="file" id="xlsxInput" accept=".xlsx,.xlsm,.xls" hidden></label>
+        <button class="btn ghost" id="exportXlsx">Baixar planilha desta edição</button>
         <button class="btn ghost" id="exportJson">Exportar .json</button>
         <label class="btn ghost">Importar .json<input type="file" id="jsonInput" accept=".json" hidden></label>
-        <button class="btn ghost" id="addCompetitor">Adicionar competidor</button>
-        <button class="btn danger" id="resetData">Descartar alterações</button>
+        <button class="btn danger" id="resetData">Descartar alterações desta edição</button>
         <span class="status-msg" id="statusMsg" role="status"></span>
+      </div>
+    </div>
+  </section>
+
+  <!-- EDIÇÕES -->
+  <section class="panel" id="tab-edicoes" hidden>
+    <div class="card">
+      <div class="card-head">
+        <div>
+          <h2>Edições</h2>
+          <p class="hint">Cada edição tem seus participantes, episódios e tabela de pontos. A marcada como <b>padrão</b> é a que o site abre.</p>
+        </div>
+      </div>
+      <div class="table-wrap"><table class="rank plain" id="editionsTable"></table></div>
+    </div>
+
+    <div class="ed-grid">
+      <div class="card">
+        <div class="card-head">
+          <div>
+            <h2>Nova edição</h2>
+            <p class="hint">Mesmo molde: 2 provas por episódio e a tabela de pontos copiada de outra edição (dá para mudar depois em Regras).</p>
+          </div>
+        </div>
+        <form class="form" id="newEditionForm" autocomplete="off">
+          <div class="field"><label for="neTitle">Nome</label><input class="input" id="neTitle" required placeholder="ex.: MasterChef 2027"></div>
+          <div class="row2">
+            <div class="field"><label for="neWeeks">Episódios</label><input class="input" id="neWeeks" type="number" min="1" max="40" value="15" required></div>
+            <div class="field"><label for="neScoring">Regras de pontuação</label><select class="input" id="neScoring"></select></div>
+          </div>
+          <div class="field">
+            <label for="nePeople">Participantes <span class="count" id="nePeopleCount">0</span></label>
+            <textarea class="input" id="nePeople" rows="8" placeholder="Um nome por linha&#10;Ana&#10;Bruno&#10;Carla"></textarea>
+          </div>
+          <div class="actions">
+            <button class="btn" type="submit">Criar edição</button>
+            <label class="btn ghost">ou criar a partir de uma planilha (.xlsx)<input type="file" id="newFromXlsx" accept=".xlsx,.xlsm,.xls" hidden></label>
+          </div>
+          <p class="status-msg" id="neMsg" role="status"></p>
+        </form>
+      </div>
+
+      <div class="card">
+        <div class="card-head">
+          <div>
+            <h2>Participantes · <span id="peopleEdTitle"></span></h2>
+            <p class="hint">Renomeie clicando no nome. Remover apaga os resultados da pessoa nesta edição.</p>
+          </div>
+        </div>
+        <ul class="people" id="peopleList"></ul>
+        <form class="add-person" id="addPersonForm" autocomplete="off">
+          <input class="input" id="addPersonName" placeholder="Nome do novo participante" required>
+          <button class="btn" type="submit">Adicionar</button>
+        </form>
+        <div class="weeks-ctl">
+          <span>Episódios nesta edição: <b id="weeksCount">0</b></span>
+          <button class="btn ghost" id="addWeek" type="button">+ episódio</button>
+          <button class="btn ghost" id="removeWeek" type="button">− último episódio</button>
+        </div>
       </div>
     </div>
   </section>

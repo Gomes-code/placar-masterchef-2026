@@ -1,32 +1,37 @@
-# Placar MasterChef 2026
+# Placar MasterChef
 
-Web app estático (HTML + JS, sem build) com a classificação, a evolução e a previsão de vencedor, a partir da planilha `Dados/TABELA MASTERCHEF 2026.xlsx`.
+Web app estático (HTML + JS, sem build) com classificação, evolução e previsão de vencedor. Suporta várias edições (2026, 2027, …), cada uma com seus participantes, episódios e tabela de pontos.
 
-## Como usar
+Site: https://gomes-code.github.io/placar-masterchef-2026/
 
-Abra `index.html` no navegador. Precisa de internet para carregar o Chart.js e o SheetJS (CDN).
+## Telas
 
-- **Classificação**: ranking (pontos, pins, vitórias em equipe, variação na semana) e o quadro de provas colorido.
-- **Evolução**: pontos acumulados e posição por semana.
-- **Previsões**: chance de vencer (simulação Monte Carlo), desempenho × consistência e detalhes do modelo.
-- **Lançar resultados**: edite os códigos prova a prova. Fica salvo no navegador (localStorage). Também dá para importar a planilha `.xlsx` atualizada ou exportar/importar `.json`.
-- **Regras**: tabela de pontuação (editável).
+- **Placar**: pódio, resumo do último episódio, classificação com a posição em cada episódio, gráfico de evolução e o quadro de resultados por prova.
+- **Estatísticas**: chance de vencer (simulação Monte Carlo), desempenho × consistência e detalhes do modelo.
+- **Lançar resultados**: escolha o episódio e clique nas células para lançar os códigos.
+- **Edições**: criar edição nova, escolher a edição padrão do site, participantes e número de episódios, baixar a planilha de uma edição.
+- **Regras**: tabela de pontuação da edição (editável).
 
-## Adicionar os resultados de um novo episódio
+O seletor ao lado do título troca de edição. O link com `?edicao=<id>` abre direto numa edição (ex.: `?edicao=masterchef-2026`).
 
-**Jeito 1 — pela planilha (recomendado):**
+## Criar uma edição nova
 
-1. Preencha os códigos da semana na aba *Placar* de `Dados/TABELA MASTERCHEF 2026.xlsx`, salve e feche o Excel.
-2. Dê dois cliques em `publicar.bat`. Ele lê a planilha, gera `data.js`, faz o commit e envia para o GitHub.
-3. Em 1–2 minutos o site publicado mostra os novos resultados.
+1. Aba **Edições** → **Nova edição**: nome (ex.: “MasterChef 2027”), número de episódios, de qual edição copiar as regras de pontos e a lista de participantes (um por linha).
+2. Lance os episódios em **Lançar resultados**.
+3. Para publicar: **Lançar resultados** → **Baixar data.js** e substitua o `data.js` do projeto (ele leva todas as edições). Depois, commit e push.
 
-**Jeito 2 — pelo próprio app:**
+Enquanto não for publicada, a edição aparece como “só neste navegador”.
 
-1. Na aba *Lançar resultados*, escolha os códigos das novas provas.
-2. Clique em **Baixar data.js**, substitua o `data.js` da pasta do projeto pelo arquivo baixado.
-3. Faça commit e push (GitHub Desktop ou `git commit` + `git push`). Não rode o `publicar.bat` nesse caso, porque ele regeraria o `data.js` a partir da planilha.
+## Adicionar resultados de novos episódios
 
-> O que é lançado no app sem publicar fica só naquele navegador. Para os visitantes verem, precisa passar pelo `data.js` publicado. Quando um `data.js` novo é publicado, as edições locais antigas são descartadas automaticamente.
+**Pelo app** (qualquer edição): lance em *Lançar resultados* → **Baixar data.js** → substitua o arquivo → commit e push (GitHub Desktop ou `git`).
+
+**Pela planilha**: cada arquivo `Dados/TABELA <NOME>.xlsx` vira uma edição (ex.: `TABELA MASTERCHEF 2027.xlsx` → “MasterChef 2027”). Para ter a planilha de uma edição criada no app, use **Edições → Planilha**; ela sai no mesmo formato da de 2026.
+Preencha, salve e feche o Excel, e dê dois cliques em `publicar.bat`. Ele lê todas as planilhas de `Dados/`, atualiza o `data.js` (mantendo as edições que não vieram de planilha), faz o commit e envia.
+
+> Não misture os dois jeitos na mesma edição: o `publicar.bat` sobrescreve, com o conteúdo da planilha, as edições que têm planilha em `Dados/`.
+
+> O que é lançado no app sem publicar fica só naquele navegador. Quando um `data.js` novo é publicado, as alterações locais das edições que mudaram são descartadas automaticamente. Edições criadas no navegador e ainda não publicadas são mantidas.
 
 ## Regras de cálculo (iguais às da planilha)
 
