@@ -19,11 +19,11 @@
   --series-5: #e87ba4; --series-6: #008300; --series-7: #4a3aa7; --series-8: #e34948;
   --series-muted: #cfcdc6;
 
-  /* resultado das provas: azul (soma) ↔ vermelho (tira) */
-  --pos-3: #1c5cab; --pos-3-ink: #ffffff;
-  --pos-2: #2a78d6; --pos-2-ink: #ffffff;
-  --pos-1: #86b6ef; --pos-1-ink: #0b1e36;
-  --pos-0: #cde2fb; --pos-0-ink: #0b1e36;
+  /* resultado das provas: verde (soma) ↔ vermelho (tira) */
+  --pos-3: #0f6b2f; --pos-3-ink: #ffffff;
+  --pos-2: #1e8f45; --pos-2-ink: #ffffff;
+  --pos-1: #8fd6a4; --pos-1-ink: #062a12;
+  --pos-0: #d4f0dc; --pos-0-ink: #062a12;
   --neu:   #e7e5df; --neu-ink:   #3a3936;
   --neg-1: #f8d3cf; --neg-1-ink: #6b1414;
   --neg-2: #ee8f8a; --neg-2-ink: #3d0808;
@@ -45,10 +45,10 @@
     --series-1: #3987e5; --series-2: #d95926; --series-3: #199e70; --series-4: #c98500;
     --series-5: #d55181; --series-6: #008300; --series-7: #9085e9; --series-8: #e66767;
     --series-muted: #464643;
-    --pos-3: #9ec5f4; --pos-3-ink: #08182c;
-    --pos-2: #3987e5; --pos-2-ink: #ffffff;
-    --pos-1: #1f5fae; --pos-1-ink: #ffffff;
-    --pos-0: #163e70; --pos-0-ink: #e3eefc;
+    --pos-3: #9fe0b2; --pos-3-ink: #062a12;
+    --pos-2: #1e8f49; --pos-2-ink: #ffffff;
+    --pos-1: #17663a; --pos-1-ink: #ffffff;
+    --pos-0: #0f3f25; --pos-0-ink: #dff5e6;
     --neu: #3a3a36; --neu-ink: #e4e3dc;
     --neg-1: #5a2424; --neg-1-ink: #ffd9d6;
     --neg-2: #a33636; --neg-2-ink: #ffffff;
@@ -65,10 +65,10 @@
   --series-1: #3987e5; --series-2: #d95926; --series-3: #199e70; --series-4: #c98500;
   --series-5: #d55181; --series-6: #008300; --series-7: #9085e9; --series-8: #e66767;
   --series-muted: #464643;
-  --pos-3: #9ec5f4; --pos-3-ink: #08182c;
-  --pos-2: #3987e5; --pos-2-ink: #ffffff;
-  --pos-1: #1f5fae; --pos-1-ink: #ffffff;
-  --pos-0: #163e70; --pos-0-ink: #e3eefc;
+  --pos-3: #9fe0b2; --pos-3-ink: #062a12;
+    --pos-2: #1e8f49; --pos-2-ink: #ffffff;
+    --pos-1: #17663a; --pos-1-ink: #ffffff;
+    --pos-0: #0f3f25; --pos-0-ink: #dff5e6;
   --neu: #3a3a36; --neu-ink: #e4e3dc;
   --neg-1: #5a2424; --neg-1-ink: #ffd9d6;
   --neg-2: #a33636; --neg-2-ink: #ffffff;
