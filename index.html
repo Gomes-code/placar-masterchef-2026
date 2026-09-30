@@ -1,0 +1,178 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Placar MasterChef 2026</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=DM+Serif+Display&family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="styles.css">
+</head>
+<body>
+<header class="topbar">
+  <div class="brand">
+    <span class="brand-mark" aria-hidden="true">
+      <svg viewBox="0 0 24 24" width="22" height="22"><path fill="currentColor" d="M12 3a4.5 4.5 0 0 0-4.3 3.2A4 4 0 0 0 6 14v5a2 2 0 0 0 2 2h8a2 2 0 0 0 2-2v-5a4 4 0 0 0-1.7-7.8A4.5 4.5 0 0 0 12 3Zm-4 13h8v3H8v-3Z"/></svg>
+    </span>
+    <div>
+      <h1>Placar MasterChef 2026</h1>
+      <p class="sub" id="subtitle">—</p>
+    </div>
+  </div>
+  <nav class="tabs" role="tablist">
+    <button role="tab" data-tab="classificacao" aria-selected="true">Classificação</button>
+    <button role="tab" data-tab="evolucao">Evolução</button>
+    <button role="tab" data-tab="previsoes">Previsões</button>
+    <button role="tab" data-tab="lancar">Lançar resultados</button>
+    <button role="tab" data-tab="regras">Regras</button>
+  </nav>
+  <button class="icon-btn" id="themeToggle" title="Alternar tema claro/escuro" aria-label="Alternar tema">
+    <svg viewBox="0 0 24 24" width="18" height="18"><path fill="currentColor" d="M12 3a9 9 0 1 0 9 9 7 7 0 0 1-9-9Z"/></svg>
+  </button>
+</header>
+
+<main>
+  <!-- CLASSIFICAÇÃO -->
+  <section class="panel" id="tab-classificacao">
+    <div class="kpis" id="kpis"></div>
+
+    <div class="card">
+      <div class="card-head">
+        <h2>Classificação geral</h2>
+        <label class="toggle"><input type="checkbox" id="onlyActive"> Só quem está na disputa</label>
+      </div>
+      <div class="table-wrap">
+        <table class="rank" id="rankTable"></table>
+      </div>
+    </div>
+
+    <div class="card">
+      <div class="card-head">
+        <h2>Quadro de provas</h2>
+        <p class="hint">Cada célula mostra o resultado na prova. A cor segue os pontos: azul soma, vermelho tira.</p>
+      </div>
+      <div class="table-wrap">
+        <table class="grid" id="boardTable"></table>
+      </div>
+      <div class="legend-codes" id="codeLegend"></div>
+    </div>
+  </section>
+
+  <!-- EVOLUÇÃO -->
+  <section class="panel" id="tab-evolucao" hidden>
+    <div class="card">
+      <div class="card-head">
+        <h2>Pontuação acumulada por semana</h2>
+        <label class="toggle"><input type="checkbox" id="showEliminated" checked> Mostrar eliminados</label>
+      </div>
+      <div class="chart-box tall"><canvas id="cumChart"></canvas></div>
+    </div>
+    <div class="card">
+      <div class="card-head">
+        <h2>Posição na classificação por semana</h2>
+        <p class="hint">Quem está na disputa. 1º lugar no topo.</p>
+      </div>
+      <div class="chart-box"><canvas id="rankChart"></canvas></div>
+    </div>
+  </section>
+
+  <!-- PREVISÕES -->
+  <section class="panel" id="tab-previsoes" hidden>
+    <div class="card controls">
+      <div class="control">
+        <label for="momentum">Peso da fase recente <output id="momentumOut">50%</output></label>
+        <input type="range" id="momentum" min="0" max="100" step="5" value="50">
+        <small>0% = só a média da temporada · 100% = só as últimas semanas</small>
+      </div>
+      <div class="control">
+        <label for="sims">Simulações <output id="simsOut">20.000</output></label>
+        <input type="range" id="sims" min="2000" max="50000" step="2000" value="20000">
+        <small>Mais simulações = resultado mais estável</small>
+      </div>
+      <button class="btn" id="rerun">Simular de novo</button>
+    </div>
+
+    <div class="pred-grid">
+      <div class="card">
+        <div class="card-head">
+          <h2>Chance de vencer</h2>
+          <p class="hint" id="predHint"></p>
+        </div>
+        <div class="chart-box"><canvas id="probChart"></canvas></div>
+      </div>
+      <div class="card">
+        <div class="card-head">
+          <h2>Desempenho × consistência</h2>
+          <p class="hint">Tamanho do ponto = pins. Canto superior direito = favorito.</p>
+        </div>
+        <div class="chart-box"><canvas id="scatterChart"></canvas></div>
+      </div>
+    </div>
+
+    <div class="card">
+      <div class="card-head"><h2>Detalhe do modelo</h2></div>
+      <div class="table-wrap"><table class="rank" id="predTable"></table></div>
+      <details class="method">
+        <summary>Como a previsão é calculada</summary>
+        <ol>
+          <li><b>Pontos por semana</b>: soma das duas provas da semana (semanas sem participação, como a repescagem para quem não foi eliminado, ficam de fora).</li>
+          <li><b>Desempenho esperado</b>: mistura da média da temporada com a média recente (pesos decrescentes para semanas antigas). O controle “peso da fase recente” define a mistura.</li>
+          <li><b>Oscilação</b>: desvio padrão dos pontos semanais. Quem oscila muito tem mais chance de ter uma semana ruim.</li>
+          <li><b>Consistência</b>: % das provas disputadas fora da zona de risco (sem PE, P, PP, ED, DE, DLE).</li>
+          <li><b>Simulação (Monte Carlo)</b>: a cada rodada, cada participante tira uma nota aleatória em torno do seu desempenho esperado, com a sua oscilação. O menor sai. Repete até sobrar um. A chance de vencer é a fração de simulações em que a pessoa sobra.</li>
+        </ol>
+        <p>É um modelo estatístico simples: não sabe quais provas virão nem quem os jurados preferem. Serve para comparar, não para cravar.</p>
+      </details>
+    </div>
+  </section>
+
+  <!-- LANÇAR -->
+  <section class="panel" id="tab-lancar" hidden>
+    <div class="card">
+      <div class="card-head">
+        <h2>Lançar resultados</h2>
+        <p class="hint">Escolha o código em cada prova. As mudanças ficam salvas neste navegador e atualizam todas as telas.</p>
+      </div>
+      <div class="actions">
+        <label class="btn">
+          Importar planilha (.xlsx)
+          <input type="file" id="xlsxInput" accept=".xlsx,.xlsm,.xls" hidden>
+        </label>
+        <button class="btn ghost" id="exportDataJs" title="Substitua o data.js do projeto por este arquivo e publique">Baixar data.js (para publicar)</button>
+        <button class="btn ghost" id="exportJson">Exportar dados (.json)</button>
+        <label class="btn ghost">
+          Importar dados (.json)
+          <input type="file" id="jsonInput" accept=".json" hidden>
+        </label>
+        <button class="btn ghost" id="addCompetitor">Adicionar competidor</button>
+        <button class="btn danger" id="resetData">Voltar aos dados da planilha</button>
+        <span class="status-msg" id="statusMsg" role="status"></span>
+      </div>
+      <div class="table-wrap">
+        <table class="grid edit" id="editTable"></table>
+      </div>
+      <p class="hint">“0” = não disputou a prova · “–” = fora da competição.</p>
+    </div>
+  </section>
+
+  <!-- REGRAS -->
+  <section class="panel" id="tab-regras" hidden>
+    <div class="card narrow">
+      <div class="card-head">
+        <h2>Tabela de pontuação</h2>
+        <p class="hint">Pins = vitórias individuais (código V). Vitórias em equipe = VDP + VLE + VE + VD. A pontuação total nunca fica abaixo de 0.</p>
+      </div>
+      <table class="rank" id="rulesTable"></table>
+    </div>
+  </section>
+</main>
+
+<div class="tooltip" id="tooltip" hidden></div>
+
+<script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
+<script src="data.js"></script>
+<script src="app.js"></script>
+</body>
+</html>
