@@ -26,7 +26,7 @@ Abra `index.html` no navegador. Precisa de internet para carregar o Chart.js e o
 2. Clique em **Baixar data.js**, substitua o `data.js` da pasta do projeto pelo arquivo baixado.
 3. Faça commit e push (GitHub Desktop ou `git commit` + `git push`). Não rode o `publicar.bat` nesse caso, porque ele regeraria o `data.js` a partir da planilha.
 
-> O que é lançado no app sem publicar fica só no seu navegador. Para os visitantes verem, precisa passar pelo `data.js` publicado.
+> O que é lançado no app sem publicar fica só naquele navegador. Para os visitantes verem, precisa passar pelo `data.js` publicado. Quando um `data.js` novo é publicado, as edições locais antigas são descartadas automaticamente.
 
 ## Regras de cálculo (iguais às da planilha)
 

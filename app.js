@@ -2,7 +2,7 @@
 (() => {
   "use strict";
 
-  const STORAGE_KEY = "mc2026-data-v1";
+  const STORAGE_KEY = "mc2026-data-v2";
   const THEME_KEY = "mc2026-theme";
   const TEAM_WIN = new Set(["VDP", "VLE", "VE", "VD"]);
   const RISK = new Set(["PE", "P", "PP", "ED", "DE", "DLE", "E"]);
@@ -30,10 +30,16 @@
   let activeTab = "classificacao";
   let sortKey = null;
 
+  // impressão digital do data.js publicado: se mudar, edições locais antigas são descartadas
+  const BASE_ID = (() => { const t = JSON.stringify(window.MASTERCHEF_DATA); let h = 0; for (let i = 0; i < t.length; i++) h = (h * 31 + t.charCodeAt(i)) | 0; return String(h); })();
   function loadData() {
     const saved = store.get(STORAGE_KEY);
     if (saved) {
-      try { return normalize(JSON.parse(saved)); } catch { /* cai para o padrão */ }
+      try {
+        const s = JSON.parse(saved);
+        if (s.base === BASE_ID && s.data) return normalize(s.data);
+        store.del(STORAGE_KEY);
+      } catch { /* cai para o padrão */ }
     }
     return normalize(clone(window.MASTERCHEF_DATA));
   }
@@ -47,7 +53,7 @@
     });
     return d;
   }
-  function save() { store.set(STORAGE_KEY, JSON.stringify(data)); }
+  function save() { store.set(STORAGE_KEY, JSON.stringify({ base: BASE_ID, data })); }
 
   /* ---------------- modelo ---------------- */
   function compute(d) {
@@ -678,9 +684,7 @@
       link.click(); URL.revokeObjectURL(link.href);
     };
     $("#exportDataJs").addEventListener("click", () => {
-      download("data.js", "// Exportado pelo app (Lançar resultados).
-window.MASTERCHEF_DATA = " + JSON.stringify(data, null, 1) + ";
-", "text/javascript");
+      download("data.js", "// Exportado pelo app (Lançar resultados).\nwindow.MASTERCHEF_DATA = " + JSON.stringify(data, null, 1) + ";\n", "text/javascript");
       flash("data.js baixado: substitua o arquivo na pasta do projeto e rode publicar.bat.");
     });
     $("#exportJson").addEventListener("click", () => {
