@@ -2,7 +2,7 @@
 chcp 65001 >nul
 cd /d "%~dp0"
 echo.
-echo === 1/3 Lendo a planilha Dados\TABELA MASTERCHEF 2026.xlsx ===
+echo === 1/3 Lendo as planilhas da pasta Dados ===
 py scripts\extrair_dados.py || (echo ERRO ao ler as planilhas. Alguma esta aberta no Excel? Salve e feche. & pause & exit /b 1)
 echo.
 echo === 2/3 Salvando versao (commit) ===
