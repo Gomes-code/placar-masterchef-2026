@@ -442,6 +442,23 @@ tr.out .wkc .wp.plus, tr.out .wkc .wp.minus { color: var(--text-muted); }
 .wkc.gone { padding: 8px 6px; }
 .gone-fill { display: block; height: 51px; border-radius: 7px; background: repeating-linear-gradient(135deg, transparent 0 5px, var(--grid-line) 5px 6px); }
 
+
+/* ============ planilha do Google ============ */
+.sync-bar { display: flex; flex-wrap: wrap; align-items: center; gap: 8px 12px; padding: 10px 14px; margin-bottom: 16px; border-radius: 12px; background: var(--surface-2); color: var(--text-secondary); font-size: 12.5px; }
+.sync-bar:empty { display: none; }
+.sync-bar code { font-size: 12px; background: var(--surface-1); padding: 1px 5px; border-radius: 5px; }
+.sync-bar .dot { width: 8px; height: 8px; border-radius: 50%; background: var(--text-muted); flex: none; }
+.sync-bar .dot.ok { background: var(--good); }
+.sync-bar .dot.err { background: var(--critical); }
+.sync-bar .pending { color: var(--series-2); font-weight: 600; margin-left: auto; }
+.code-tag { font: 600 11px Inter, sans-serif; color: var(--text-muted); background: var(--surface-2); padding: 2px 6px; border-radius: 6px; margin-left: 4px; }
+tr.migrate td { background: color-mix(in srgb, var(--accent-strong) 6%, var(--surface-1)); }
+.row2.wide-first { grid-template-columns: minmax(0, 1fr) 150px; }
+[hidden] { display: none !important; }
+.avatar { position: relative; overflow: hidden; }
+.avatar.has-photo img { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: cover; }
+body.loading main { opacity: .4; pointer-events: none; }
+
 /* ============ responsivo ============ */
 @media (max-width: 1080px) {
   .hero { grid-template-columns: minmax(0, 1fr); }

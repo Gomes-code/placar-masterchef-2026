@@ -30,13 +30,30 @@
    */
   const clone = (o) => JSON.parse(JSON.stringify(o));
   const hash = (o) => { const t = JSON.stringify(o); let h = 0; for (let i = 0; i < t.length; i++) h = (h * 31 + t.charCodeAt(i)) | 0; return String(h); };
-  const published = (() => {
+  /* Fonte dos dados publicados: a planilha do Google (config.js → sheetsUrl) ou, sem ela, o data.js.
+   * O data.js também serve de cópia de segurança quando a planilha não responde. */
+  const CONFIG = window.PLACAR_CONFIG || {};
+  const SHEETS_URL = String(CONFIG.sheetsUrl || "").trim();
+  const ADMIN_KEY_STORE = "mc-placar-admin";
+  // códigos no padrão MC-AAAA (ex.: "MasterChef 2026" → MC-2026)
+  const codeFor = (e) => {
+    if (/^MC-/i.test(e.id || "")) return e.id.toUpperCase();
+    const y = String(e.title || e.id || "").match(/\d{4}/);
+    return "MC-" + (y ? y[0] : String(e.title || e.id || "edicao").normalize("NFKD").replace(/[^A-Za-z0-9]+/g, "-").replace(/^-|-$/g, "").toUpperCase());
+  };
+  const fileBundle = (() => {
     const raw = window.MASTERCHEF_EDITIONS
-      || (window.MASTERCHEF_DATA && { default: "masterchef-2026", editions: [{ id: "masterchef-2026", title: "MasterChef 2026", ...window.MASTERCHEF_DATA }] })
+      || (window.MASTERCHEF_DATA && { default: "MC-2026", editions: [{ id: "MC-2026", title: "MasterChef 2026", ...window.MASTERCHEF_DATA }] })
       || { default: null, editions: [] };
-    const eds = raw.editions.map((e) => normalize(clone(e)));
-    return { default: raw.default, editions: eds, hashes: Object.fromEntries(raw.editions.map((e) => [e.id, hash(e)])) };
+    const out = clone(raw);
+    const map = {};
+    out.editions.forEach((e) => { const c = codeFor(e); map[e.id] = c; e.id = c; });
+    out.default = map[out.default] || out.default;
+    return out;
   })();
+  let source = "file"; // "sheets" quando os dados vieram da planilha
+  const sourceInfo = { loadedAt: null, error: null, busy: false };
+  let published = makePublished(fileBundle);
   let local = loadLocal();
   let editions = mergeEditions();
   let data = null; // edição aberta
@@ -46,6 +63,17 @@
   let activeTab = "placar";
   let evoMode = "rank";
   let editWeek = null; // índice da semana em edição, ou "all"
+
+  function makePublished(raw) {
+    const eds = raw.editions.map((e) => normalize(clone(e)));
+    return { default: raw.default, editions: eds, hashes: Object.fromEntries(raw.editions.map((e) => [e.id, hash(e)])) };
+  }
+  function useBundle(raw, src) {
+    published = makePublished(raw);
+    source = src;
+    local = loadLocal();
+    editions = mergeEditions();
+  }
 
   function loadLocal() {
     const empty = { eds: {}, deleted: [], order: [], default: null, current: null };
@@ -69,7 +97,7 @@
   }
   const defaultId = () => {
     const ids = editions.map((e) => e.id);
-    if (local.default && ids.includes(local.default)) return local.default;
+    if (source === "file" && local.default && ids.includes(local.default)) return local.default;
     if (published.default && ids.includes(published.default)) return published.default;
     return ids[ids.length - 1] || null;
   };
@@ -136,7 +164,7 @@
       vals.forEach((v, i) => { const wt = RECENT_DECAY ** (vals.length - 1 - i); wsum += v * wt; wtot += wt; });
       const risk = played.filter((k) => RISK.has(k)).length;
       return {
-        idx, name: c.name, results: c.results, weekly, present, cum,
+        idx, name: c.name, photo: c.photo || null, results: c.results, weekly, present, cum,
         total: Math.max(0, played.reduce((a, k) => a + pts[k], 0)),
         pins: c.results.filter((k) => k === "V").length,
         teamWins: c.results.filter((k) => TEAM_WIN.has(k)).length,
@@ -243,7 +271,7 @@
   };
   const codeText = (code) => (code === "0" ? "·" : code === "-" ? "" : code);
   const initials = (n) => n.replace(/\./g, "").split(/\s+/).map((p) => p[0]).join("").slice(0, 2).toUpperCase();
-  const avatar = (c) => `<span class="avatar" style="border-color:${seriesColor(c)}">${esc(initials(c.name))}</span>`;
+  const avatar = (c) => `<span class="avatar${c.photo ? " has-photo" : ""}" style="border-color:${seriesColor(c)}">${c.photo ? `<img src="${esc(c.photo)}" alt="" loading="lazy" referrerpolicy="no-referrer" onerror="this.remove()">` : ""}<span>${esc(initials(c.name))}</span></span>`;
   const pinIcon = (cls = "pin") => `<svg class="${cls}" aria-hidden="true"><use href="#pin"/></svg>`;
   const pinsHtml = (n) => (n ? `<span class="pins" title="${n} pin${n > 1 ? "s" : ""}">${pinIcon().repeat(n)}</span>` : '<span class="dash">—</span>');
   const shortWeek = (label) => label.replace(/^Semana\s*/i, "S").replace(/^Repescagem$/i, "Rep");
@@ -708,12 +736,14 @@
   }
 
   function renderRules() {
+    const ro = source === "sheets";
+    $("#rulesHint").textContent = ro ? "Os pontos vêm da aba “Pontuação” da planilha do Google. Para mudar, edite lá e recarregue." : "";
     $("#rulesTable").innerHTML = `
       <thead><tr><th>Código</th><th>Resultado</th><th class="r">Pontos</th></tr></thead>
       <tbody>${[...data.scoring].sort((a, b) => b.pts - a.pts).map((s) => `
         <tr><td><span class="code ${codeClass(s.code)} ${s.code === "V" ? "win" : ""}" style="width:48px">${esc(s.code)}</span></td>
         <td>${esc(sentence(s.label))}${s.code === "V" ? ` ${pinIcon()}` : ""}</td>
-        <td class="r"><input class="input num" type="number" data-rule="${esc(s.code)}" value="${s.pts}" style="min-width:0;width:74px;text-align:right" aria-label="Pontos de ${esc(s.code)}"></td></tr>`).join("")}</tbody>`;
+        <td class="r">${ro ? `<b class="num">${signed(s.pts)}</b>` : `<input class="input num" type="number" data-rule="${esc(s.code)}" value="${s.pts}" style="min-width:0;width:74px;text-align:right" aria-label="Pontos de ${esc(s.code)}">`}</td></tr>`).join("")}</tbody>`;
   }
 
   /* ---------------- edições: painel ---------------- */
@@ -726,11 +756,17 @@
     ["ED", "ELIMINAÇÃO DIRETA", -2], ["DLE", "DERROTA LÍDER EQUIPE", -2],
   ].map(([code, label, pts]) => ({ code, label, pts }));
   const weekLabel = (n) => `Semana ${String(n).padStart(2, "0")}`;
-  const titleFromFile = (name) => name.replace(/\.[^.]+$/, "").replace(/^\s*tabela\s+/i, "").trim().toLowerCase()
-    .replace(/(^|\s)\S/g, (m) => m.toUpperCase()).replace(/masterchef/i, "MasterChef");
+  const titleFromFile = (name) => {
+    const base = name.replace(/\.[^.]+$/, "").replace(/^\s*tabela\s+/i, "").trim();
+    if (/^MC-/i.test(base)) return base.replace(/^MC-?/i, "MasterChef ").trim();
+    return base.toLowerCase().replace(/(^|\s)\S/g, (m) => m.toUpperCase()).replace(/masterchef/i, "MasterChef");
+  };
 
   function addEdition(ed) {
-    ed.id = uniqueId(ed.title);
+    const want = ed.id ? ed.id.toUpperCase() : codeFor(ed);
+    let id = want, n = 2;
+    while (editions.some((e) => e.id === id)) id = `${want}-${n++}`;
+    ed.id = id;
     local.eds[ed.id] = { base: null, data: ed };
     saveLocal();
     editions = mergeEditions();
@@ -739,6 +775,8 @@
 
   function renderEditions() {
     const def = defaultId();
+    const sheets = source === "sheets";
+    const pubHint = sheets ? "Clique em “Salvar na planilha” para gravar no Google Sheets" : "Baixe o data.js e publique para aparecer no site";
     const rows = editions.map((e) => {
       const m = e === data ? model : compute(e);
       const w = m.currentWeek;
@@ -748,29 +786,39 @@
       const badges = [
         e.id === def ? '<span class="badge gold">padrão do site</span>' : "",
         isOpen ? '<span class="badge cur">aberta</span>' : "",
-        st === "local" ? '<span class="badge warn" title="Baixe o data.js e publique para aparecer no site">só neste navegador</span>' : "",
-        st === "changed" ? '<span class="badge warn" title="Baixe o data.js e publique para aparecer no site">alterada neste navegador</span>' : "",
+        st === "local" ? `<span class="badge warn" title="${pubHint}">${sheets ? "ainda não está na planilha" : "só neste navegador"}</span>` : "",
+        st === "changed" ? `<span class="badge warn" title="${pubHint}">alterada neste navegador</span>` : "",
       ].join("");
       return `<tr>
-        <td><b>${esc(e.title)}</b>${badges}</td>
+        <td><b>${esc(e.title)}</b> <span class="code-tag">${esc(e.id)}</span>${badges}</td>
         <td class="c num">${e.competitors.length}</td>
         <td class="c num">${w + 1} / ${e.weeks.length}</td>
         <td>${leader ? `${esc(leader.name)} · ${fmt(leader.total)} pts` : '<span class="dash">—</span>'}</td>
         <td><div class="row-actions">
           ${isOpen ? "" : `<button class="btn sm" data-ed-open="${esc(e.id)}">Abrir</button>`}
           ${e.id === def ? "" : `<button class="btn ghost sm" data-ed-default="${esc(e.id)}">Tornar padrão</button>`}
-          <button class="btn ghost sm" data-ed-xlsx="${esc(e.id)}">Planilha</button>
-          <button class="btn danger sm" data-ed-del="${esc(e.id)}">Excluir</button>
+          <button class="btn ghost sm" data-ed-xlsx="${esc(e.id)}" title="Baixar como planilha Excel">Excel</button>
+          <button class="btn danger sm" data-ed-del="${esc(e.id)}" ${sheets && st !== "local" ? `title="Na planilha: apague a aba ${esc(e.id)} e recarregue"` : ""}>Excluir</button>
         </div></td>
       </tr>`;
     }).join("");
+    // edições que existem no data.js mas ainda não na planilha (migração)
+    const missing = sheets ? fileBundle.editions.filter((e) => !published.hashes[e.id]) : [];
+    const migrate = missing.map((e) => `<tr class="migrate">
+        <td><b>${esc(e.title)}</b> <span class="code-tag">${esc(e.id)}</span><span class="badge">só no data.js</span></td>
+        <td class="c num">${e.competitors.length}</td><td class="c">—</td><td class="hint">Ainda não está na planilha do Google.</td>
+        <td><div class="row-actions"><button class="btn sm" data-migrate="${esc(e.id)}">Enviar para a planilha</button></div></td></tr>`).join("");
     $("#editionsTable").innerHTML = `
       <thead><tr><th>Edição</th><th class="c">Participantes</th><th class="c">Episódios</th><th>Líder</th><th class="r">Ações</th></tr></thead>
-      <tbody>${rows || '<tr><td colspan="5" class="empty-state">Nenhuma edição ainda. Crie a primeira abaixo.</td></tr>'}</tbody>`;
+      <tbody>${rows + migrate || '<tr><td colspan="5" class="empty-state">Nenhuma edição ainda. Crie a primeira abaixo.</td></tr>'}</tbody>`;
 
     const sc = $("#neScoring"), keep = sc.value;
     sc.innerHTML = editions.map((e) => `<option value="${esc(e.id)}">Copiar de ${esc(e.title)}</option>`).join("") + '<option value="__default">Tabela padrão</option>';
     if ([...sc.options].some((o) => o.value === keep)) sc.value = keep; else if (data) sc.value = data.id;
+    $("#neScoringField").hidden = sheets; // na planilha, a pontuação é a da aba "Pontuação"
+    $("#neHint").textContent = sheets
+      ? "Cria a aba na planilha do Google no modelo (FOTO | COMPETIDOR | 1ª PROVA 1 | 2ª PROVA 1…), vazia, pronta para os participantes e os resultados."
+      : "Mesmo molde: 2 provas por episódio e a tabela de pontos copiada de outra edição (dá para mudar depois em Regras).";
 
     $("#peopleEdTitle").textContent = data ? data.title : "—";
     $("#addPersonForm").hidden = !data;
@@ -788,33 +836,130 @@
     const st = data ? edStatus(data.id) : "published";
     btn.disabled = st !== "changed";
     btn.title = st === "local" ? "Edição criada neste navegador: não há versão publicada para voltar" : st === "published" ? "Nada alterado nesta edição" : "";
+    renderSync();
   }
 
-  /* planilha no mesmo formato da aba Placar original (o importador e o publicar.bat leem de volta) */
+  /* planilha no modelo MC (aba "Banco de Dados"): o importador do app, o publicar.bat e a planilha do Google leem de volta */
   function exportXlsx(ed) {
     if (typeof XLSX === "undefined") { flash("Gerador de planilhas não carregou (sem internet?)."); return; }
-    const m = compute(ed);
-    const nW = ed.weeks.length, first = 7; // coluna H
-    const rows = [[], []];
-    rows[0][0] = "PLACAR"; rows[1][0] = "POSIÇÃO"; rows[1][2] = "COMPETIDORES"; rows[1][4] = "PINS"; rows[1][5] = "PONT."; rows[1][6] = "VIT. EQP.";
+    const nW = ed.weeks.length, first = 2; // coluna C
+    const head = ["", ""], provas = ["FOTO", "COMPETIDOR"];
     ed.weeks.forEach((w, i) => {
-      rows[0][first + 2 * i] = i === 0 ? "SEMANA 01" : w.label.toUpperCase(); // o importador procura "SEMANA 01"
-      rows[1][first + 2 * i] = (w.provas[0] || "").toUpperCase();
-      rows[1][first + 2 * i + 1] = (w.provas[1] || "").toUpperCase();
+      head.push(String(w.label || weekLabel(i + 1)).toUpperCase(), "");
+      provas.push(w.provas[0] || `1ª PROVA ${i + 1}`, w.provas[1] || `2ª PROVA ${i + 1}`);
     });
-    m.sorted.forEach((c, r) => {
-      const row = (rows[r + 2] = rows[r + 2] || []);
-      row[0] = c.pos; row[3] = c.name; row[4] = c.pins; row[5] = c.total; row[6] = c.teamWins;
-      c.results.forEach((k, i) => (row[first + i] = k === "0" ? 0 : k));
-    });
-    const tc = first + 2 * nW + 2; // tabela de pontuação ao lado
-    rows[0][tc] = "TABELA DE PONTUAÇÕES";
-    ed.scoring.forEach((s, i) => { const row = (rows[i + 1] = rows[i + 1] || []); row[tc] = s.label; row[tc + 3] = s.code; row[tc + 4] = s.pts; });
+    const rows = [head, provas, ...ed.competitors.map((c) => [c.photo || "", c.name, ...c.results.map((k) => (k === "0" ? "" : k))])];
     const ws = XLSX.utils.aoa_to_sheet(rows);
-    ws["!cols"] = Array.from({ length: tc + 5 }, (_, i) => ({ wch: i === 3 ? 16 : i >= first && i < first + 2 * nW ? 7 : i === tc ? 30 : 6 }));
+    ws["!merges"] = ed.weeks.map((_, i) => ({ s: { r: 0, c: first + 2 * i }, e: { r: 0, c: first + 2 * i + 1 } }));
+    ws["!cols"] = [{ wch: 8 }, { wch: 18 }, ...Array.from({ length: nW * 2 }, () => ({ wch: 11 }))];
+    ws["!freeze"] = { xSplit: 2, ySplit: 2 };
     const wb = XLSX.utils.book_new();
-    XLSX.utils.book_append_sheet(wb, ws, "Placar");
-    XLSX.writeFile(wb, `TABELA ${ed.title.toUpperCase()}.xlsx`);
+    XLSX.utils.book_append_sheet(wb, ws, "Banco de Dados");
+    const sc = XLSX.utils.aoa_to_sheet([["Código", "Descrição", "Pontos"], ...ed.scoring.map((s) => [s.code, sentence(s.label), s.pts])]);
+    XLSX.utils.book_append_sheet(wb, sc, "Pontuação");
+    XLSX.writeFile(wb, `${ed.id}.xlsx`);
+  }
+
+
+  /* ---------------- Google Sheets ---------------- */
+  async function loadFromSheets() {
+    sourceInfo.busy = true; renderSync();
+    try {
+      const res = await fetch(SHEETS_URL + (SHEETS_URL.includes("?") ? "&" : "?") + "t=" + Date.now(), { cache: "no-store" });
+      const j = await res.json();
+      if (!j.ok) throw new Error(j.error || "resposta inválida");
+      useBundle(j.data, "sheets");
+      sourceInfo.loadedAt = new Date(); sourceInfo.error = null;
+      return true;
+    } catch (err) {
+      sourceInfo.error = String(err.message || err);
+      return false;
+    } finally {
+      sourceInfo.busy = false;
+    }
+  }
+
+  function adminKey(force) {
+    let k = force ? null : store.get(ADMIN_KEY_STORE);
+    if (!k) {
+      k = prompt("Senha de administrador da planilha (a mesma do ADMIN_KEY no Apps Script):");
+      if (!k) throw new Error("Operação cancelada: sem senha.");
+      store.set(ADMIN_KEY_STORE, k);
+    }
+    return k;
+  }
+
+  async function sheetsPost(payload) {
+    sourceInfo.busy = true; renderSync();
+    try {
+      const res = await fetch(SHEETS_URL, {
+        method: "POST",
+        headers: { "Content-Type": "text/plain;charset=utf-8" }, // evita preflight CORS no Apps Script
+        body: JSON.stringify({ ...payload, key: adminKey() }),
+      });
+      const j = await res.json();
+      if (!j.ok) {
+        if (/senha/i.test(j.error || "")) store.del(ADMIN_KEY_STORE);
+        throw new Error(j.error || "erro desconhecido");
+      }
+      return j.data;
+    } finally {
+      sourceInfo.busy = false;
+    }
+  }
+
+  const forSheet = (ed) => ({
+    id: ed.id, title: ed.title,
+    weeks: ed.weeks.map((w) => ({ label: w.label, provas: [...w.provas] })),
+    competitors: ed.competitors.map((c) => ({ name: c.name, results: [...c.results], ...(c.photo ? { photo: c.photo } : {}) })),
+  });
+
+  async function saveEditionToSheet(ed, { createOnly = false, keepOpen = true } = {}) {
+    if (!/^MC-/i.test(ed.id)) throw new Error("O código da edição precisa começar com MC- (ex.: MC-2027).");
+    const bundle = await sheetsPost({ action: "saveEdition", createOnly, edition: forSheet(ed) });
+    delete local.eds[ed.id]; saveLocal();
+    useBundle(bundle, "sheets");
+    sourceInfo.loadedAt = new Date(); sourceInfo.error = null;
+    if (keepOpen) openEdition(ed.id.toUpperCase());
+    refresh();
+  }
+
+  function renderSync() {
+    const els = $$("[data-sync]");
+    if (!els.length) return;
+    const time = (d) => d ? d.toLocaleTimeString("pt-BR", { hour: "2-digit", minute: "2-digit" }) : "";
+    let html;
+    if (!SHEETS_URL) {
+      html = `<span class="dot"></span><span>Fonte: <b>data.js</b> (publicação manual). Para ler direto do Google Sheets, preencha o <code>config.js</code> — veja o GOOGLE_SHEETS.md.</span>`;
+    } else if (source !== "sheets") {
+      html = `<span class="dot err"></span><span>Não foi possível ler a planilha${sourceInfo.error ? ` (${esc(sourceInfo.error)})` : ""}. Mostrando a cópia do data.js.</span>
+        <button class="btn ghost sm" data-sync-act="reload">${sourceInfo.busy ? "Tentando…" : "Tentar de novo"}</button>`;
+    } else {
+      const st = data ? edStatus(data.id) : "published";
+      const pending = data && st !== "published";
+      html = `<span class="dot ok"></span><span>Lendo da <b>planilha do Google</b>${sourceInfo.loadedAt ? ` · atualizado às ${time(sourceInfo.loadedAt)}` : ""}</span>
+        <button class="btn ghost sm" data-sync-act="reload" ${sourceInfo.busy ? "disabled" : ""}>${sourceInfo.busy ? "Carregando…" : "Recarregar"}</button>
+        ${pending ? `<span class="pending">“${esc(data.title)}” tem alterações feitas aqui que ainda não estão na planilha.</span>
+          <button class="btn sm" data-sync-act="save" ${sourceInfo.busy ? "disabled" : ""}>Salvar na planilha</button>
+          ${st === "changed" ? `<button class="btn danger sm" data-sync-act="discard">Descartar</button>` : ""}` : ""}`;
+    }
+    els.forEach((el) => (el.innerHTML = html));
+  }
+
+  async function onSyncAction(act) {
+    try {
+      if (act === "reload") {
+        const id = data && data.id;
+        const okLoad = await loadFromSheets();
+        openEdition(id); refresh();
+        flash(okLoad ? "Dados recarregados da planilha." : "A planilha não respondeu: " + sourceInfo.error);
+      } else if (act === "save") {
+        await saveEditionToSheet(data, { createOnly: edStatus(data.id) === "local" });
+        flash(`“${data.title}” salva na planilha.`);
+      } else if (act === "discard") {
+        $("#resetData").click();
+      }
+    } catch (err) { flash("Erro: " + err.message); renderSync(); }
   }
 
   /* ---------------- orquestração ---------------- */
@@ -847,35 +992,73 @@
   }
 
   /* ---------------- importação da planilha ---------------- */
+  /* Lê uma planilha .xlsx em dois formatos:
+   *  - modelo "Banco de Dados" (MC-2026.xlsx): linha 1 SEMANA 01…, linha 2 FOTO | COMPETIDOR | 1ª PROVA 1…
+   *  - formato antigo "Placar" (TABELA MASTERCHEF 2026.xlsx): colunas PINS, SEMANA 01 e TABELA DE PONTUAÇÕES */
+  const PLACEHOLDER_RX = /^\s*[12]\s*ª\s*PROVA(\s*\d+)?\s*$/i;
+  const tc = (s) => String(s || "").trim().toLowerCase().replace(/(^|\s|-)\S/g, (m) => m.toUpperCase());
+  const cellCode = (v) => {
+    const s = String(v == null ? "" : v).trim().toUpperCase();
+    if (s === "" || s === "0" || s === "·") return "0";
+    if (s === "–" || s === "—") return "-";
+    return s;
+  };
   function parseWorkbook(wb) {
-    const sheetName = wb.SheetNames.find((n) => /placar/i.test(n)) || wb.SheetNames[0];
-    const aoa = XLSX.utils.sheet_to_json(wb.Sheets[sheetName], { header: 1, defval: null, raw: true });
-    const find = (re) => { for (let r = 0; r < aoa.length; r++) for (let c = 0; c < (aoa[r] || []).length; c++) if (typeof aoa[r][c] === "string" && re.test(aoa[r][c].trim())) return [r, c]; return null; };
-    const pinsAt = find(/^PINS$/i);
-    const week1 = find(/^SEMANA 0?1$/i);
-    if (!pinsAt || !week1) throw new Error("Não encontrei as colunas PINS e SEMANA 01 na aba Placar.");
+    const sheets = wb.SheetNames.map((n) => ({ n, aoa: XLSX.utils.sheet_to_json(wb.Sheets[n], { header: 1, defval: null, raw: true }) }));
+    const findIn = (aoa, re) => { for (let r = 0; r < aoa.length; r++) for (let c = 0; c < (aoa[r] || []).length; c++) if (typeof aoa[r][c] === "string" && re.test(aoa[r][c].trim())) return [r, c]; return null; };
+
+    // modelo "Banco de Dados": cabeçalho COMPETIDOR na linha logo abaixo de SEMANA 01
+    const model = sheets.map((s) => ({ ...s, comp: findIn(s.aoa, /^COMPETIDOR(ES)?$/i), w1: findIn(s.aoa, /^SE[MN][AE]NA 0?1$/i) }))
+      .find((s) => s.comp && s.w1 && s.w1[0] === s.comp[0] - 1 && !findIn(s.aoa, /^PINS$/i));
+    if (model) {
+      const aoa = model.aoa, headRow = model.comp[0], nameCol = model.comp[1], firstCol = model.w1[1];
+      const weekRow = aoa[model.w1[0]] || [], provRow = aoa[headRow] || [];
+      const weeks = [];
+      for (let c = firstCol; c < firstCol + 80; c += 2) {
+        const lab = weekRow[c];
+        const hasData = aoa.slice(headRow + 1).some((r) => r && (String(r[c] ?? "").trim() || String(r[c + 1] ?? "").trim()));
+        if (!lab && !hasData) break;
+        const prov = (x) => (PLACEHOLDER_RX.test(String(x || "")) ? "" : tc(x));
+        weeks.push({ label: tc(String(lab || weekLabel(weeks.length + 1)).replace(/^SEMENA/i, "SEMANA")), provas: [prov(provRow[c]), prov(provRow[c + 1])] });
+      }
+      const competitors = [];
+      for (let r = headRow + 1; r < aoa.length; r++) {
+        const nm = aoa[r] && aoa[r][nameCol];
+        if (!nm || typeof nm !== "string" || !nm.trim()) continue;
+        competitors.push({ name: nm.trim(), results: Array.from({ length: weeks.length * 2 }, (_, i) => cellCode(aoa[r][firstCol + i])) });
+      }
+      if (!competitors.length) throw new Error("Nenhum competidor encontrado.");
+      let scoring = clone((data && data.scoring) || (published.editions[0] && published.editions[0].scoring) || DEFAULT_SCORING);
+      const ps = sheets.find((x) => /pontua/i.test(x.n));
+      if (ps) {
+        const list = ps.aoa.slice(1).filter((r) => r && String(r[0] ?? "").trim() && r[2] !== "" && r[2] != null && !isNaN(Number(r[2])))
+          .map((r) => ({ code: String(r[0]).trim().toUpperCase(), label: String(r[1] || r[0]).trim(), pts: Number(r[2]) }));
+        if (list.length) scoring = list;
+      }
+      return normalize({ source: "importado", weeks, scoring, competitors });
+    }
+
+    const placar = sheets.find((s) => /placar/i.test(s.n)) || sheets[0];
+    const aoa = placar.aoa;
+    const pinsAt = findIn(aoa, /^PINS$/i);
+    const week1 = findIn(aoa, /^SE[MN][AE]NA 0?1$/i);
+    if (!pinsAt || !week1) throw new Error("Formato não reconhecido: esperava o modelo MC (FOTO | COMPETIDOR | 1ª PROVA 1…) ou a aba Placar.");
     const headRow = pinsAt[0], nameCol = pinsAt[1] - 1, firstCol = week1[1];
     const weekRow = aoa[week1[0]];
     const weeks = [];
     for (let c = firstCol; c < firstCol + 60; c += 2) {
       const lab = weekRow[c];
       if (!lab || (/^SEMANA$/i.test(String(lab).trim()) && c > firstCol + 2)) break;
-      const tc = (s) => String(s || "").trim().toLowerCase().replace(/(^|\s|-)\S/g, (m) => m.toUpperCase());
-      weeks.push({ label: tc(lab), provas: [tc(aoa[headRow][c]), tc(aoa[headRow][c + 1])] });
+      weeks.push({ label: tc(String(lab).replace(/^SEMENA/i, "SEMANA")), provas: [tc(aoa[headRow][c]), tc(aoa[headRow][c + 1])] });
     }
     const competitors = [];
     for (let r = headRow + 1; r < aoa.length; r++) {
       const nm = aoa[r] && aoa[r][nameCol];
       if (!nm || typeof nm !== "string") continue;
-      const results = [];
-      for (let i = 0; i < weeks.length * 2; i++) {
-        const v = aoa[r][firstCol + i];
-        results.push(v == null || v === 0 || v === "0" ? "0" : String(v).trim().toUpperCase());
-      }
-      competitors.push({ name: nm.trim(), results });
+      competitors.push({ name: nm.trim(), results: Array.from({ length: weeks.length * 2 }, (_, i) => cellCode(aoa[r][firstCol + i])) });
     }
     let scoring = clone((data && data.scoring) || DEFAULT_SCORING);
-    const tab = find(/TABELA DE PONTUA/i);
+    const tab = findIn(aoa, /TABELA DE PONTUA/i);
     if (tab) {
       const list = [];
       for (let r = tab[0] + 1; r < aoa.length; r++) {
@@ -1017,51 +1200,93 @@
 
     // edições
     $("#editionSelect").addEventListener("change", (e) => { openEdition(e.target.value); refresh(); });
-    $("#editionsTable").addEventListener("click", (e) => {
+    document.addEventListener("click", (e) => { const b = e.target.closest("[data-sync-act]"); if (b) onSyncAction(b.dataset.syncAct); });
+    $("#editionsTable").addEventListener("click", async (e) => {
       const b = e.target.closest("button"); if (!b) return;
-      if (b.dataset.edOpen) { openEdition(b.dataset.edOpen); refresh(); }
-      else if (b.dataset.edDefault) {
-        local.default = b.dataset.edDefault; saveLocal(); openEdition(data && data.id); refresh();
-        flash("Padrão alterado neste navegador. Baixe o data.js e publique para valer no site.");
-      } else if (b.dataset.edXlsx) exportXlsx(editions.find((x) => x.id === b.dataset.edXlsx));
-      else if (b.dataset.edDel) {
-        const ed = editions.find((x) => x.id === b.dataset.edDel);
-        if (!confirm(`Excluir a edição “${ed.title}”? Os participantes e resultados dela serão apagados deste navegador.`)) return;
-        if (published.hashes[ed.id]) local.deleted.push({ id: ed.id, base: published.hashes[ed.id] });
-        delete local.eds[ed.id];
-        if (local.default === ed.id) local.default = null;
-        saveLocal(); editions = mergeEditions();
-        openEdition(data && data.id !== ed.id ? data.id : defaultId()); refresh();
-        flash(published.hashes[ed.id] ? "Edição excluída neste navegador. Baixe o data.js e publique para remover do site." : "Edição excluída.");
-      }
+      const sheets = source === "sheets";
+      try {
+        if (b.dataset.edOpen) { openEdition(b.dataset.edOpen); refresh(); }
+        else if (b.dataset.edDefault) {
+          if (sheets) {
+            const bundle = await sheetsPost({ action: "setDefault", id: b.dataset.edDefault });
+            const id = data && data.id; useBundle(bundle, "sheets"); openEdition(id); refresh();
+            flash("Edição padrão alterada na planilha.");
+          } else {
+            local.default = b.dataset.edDefault; saveLocal(); openEdition(data && data.id); refresh();
+            flash("Padrão alterado neste navegador. Baixe o data.js e publique para valer no site.");
+          }
+        } else if (b.dataset.edXlsx) exportXlsx(editions.find((x) => x.id === b.dataset.edXlsx));
+        else if (b.dataset.migrate) {
+          const ed = fileBundle.editions.find((x) => x.id === b.dataset.migrate);
+          b.disabled = true; b.textContent = "Enviando…";
+          await saveEditionToSheet(normalize(clone(ed)), { createOnly: true });
+          flash(`“${ed.title}” enviada para a planilha (aba ${ed.id}).`);
+        } else if (b.dataset.edDel) {
+          const ed = editions.find((x) => x.id === b.dataset.edDel);
+          if (sheets && edStatus(ed.id) !== "local") {
+            alert(`Para excluir “${ed.title}”, apague (ou renomeie) a aba ${ed.id} na planilha do Google e clique em Recarregar.`);
+            return;
+          }
+          if (!confirm(`Excluir a edição “${ed.title}”? Os participantes e resultados dela serão apagados deste navegador.`)) return;
+          if (published.hashes[ed.id]) local.deleted.push({ id: ed.id, base: published.hashes[ed.id] });
+          delete local.eds[ed.id];
+          if (local.default === ed.id) local.default = null;
+          saveLocal(); editions = mergeEditions();
+          openEdition(data && data.id !== ed.id ? data.id : defaultId()); refresh();
+          flash(published.hashes[ed.id] ? "Edição excluída neste navegador. Baixe o data.js e publique para remover do site." : "Edição excluída.");
+        }
+      } catch (err) { flash("Erro: " + err.message); renderEditions(); }
     });
     const nePeople = () => $("#nePeople").value.split(/\r?\n/).map((x) => x.trim()).filter(Boolean);
     $("#nePeople").addEventListener("input", () => { $("#nePeopleCount").textContent = nePeople().length; });
-    $("#newEditionForm").addEventListener("submit", (e) => {
+    // sugere o código MC-AAAA a partir do nome, até a pessoa digitar um código próprio
+    $("#neTitle").addEventListener("input", () => {
+      const code = $("#neCode");
+      if (code.dataset.touched) return;
+      const y = $("#neTitle").value.match(/\d{4}/);
+      code.value = y ? "MC-" + y[0] : "";
+    });
+    $("#neCode").addEventListener("input", (e) => { e.target.dataset.touched = "1"; e.target.value = e.target.value.toUpperCase(); });
+    $("#newEditionForm").addEventListener("submit", async (e) => {
       e.preventDefault();
       const title = $("#neTitle").value.trim();
+      let id = $("#neCode").value.trim().toUpperCase();
       if (!title) return;
+      if (!id) id = codeFor({ title });
+      if (!/^MC-[A-Z0-9-]+$/.test(id)) { flash("Código inválido: use o formato MC-2027."); $("#neCode").focus(); return; }
+      if (editions.some((x) => x.id === id)) { flash(`Já existe uma edição com o código ${id}.`); $("#neCode").focus(); return; }
       const n = Math.max(1, Math.min(40, parseInt($("#neWeeks").value, 10) || 15));
       const src = editions.find((x) => x.id === $("#neScoring").value);
       const people = [...new Set(nePeople())];
-      addEdition({
-        title, source: "criada no app",
+      const ed = {
+        id, title, source: source === "sheets" ? "Google Sheets" : "criada no app",
         weeks: Array.from({ length: n }, (_, i) => ({ label: weekLabel(i + 1), provas: ["", ""] })),
-        scoring: clone(src ? src.scoring : DEFAULT_SCORING),
+        scoring: clone(src ? src.scoring : (published.editions[0] && published.editions[0].scoring) || DEFAULT_SCORING),
         competitors: people.map((name) => ({ name, results: Array(n * 2).fill("0") })),
-      });
-      e.target.reset(); $("#neWeeks").value = 15; $("#nePeopleCount").textContent = "0";
-      refresh();
-      bind.goTab(people.length ? "lancar" : "edicoes");
-      flash(`“${title}” criada. Agora é só lançar os episódios.`);
+      };
+      const submit = e.target.querySelector('button[type="submit"]');
+      try {
+        submit.disabled = true; submit.textContent = "Criando…";
+        if (source === "sheets") await saveEditionToSheet(ed, { createOnly: true });
+        else { addEdition(ed); refresh(); }
+        e.target.reset(); delete $("#neCode").dataset.touched; $("#neWeeks").value = 15; $("#nePeopleCount").textContent = "0";
+        flash(source === "sheets"
+          ? `Aba ${id} criada na planilha do Google. Preencha os participantes e os resultados lá (ou aqui, em Lançar resultados).`
+          : `“${title}” criada. Agora é só lançar os episódios.`);
+        bind.goTab(people.length ? "lancar" : "edicoes");
+      } catch (err) { flash("Erro ao criar: " + err.message); }
+      finally { submit.disabled = false; submit.textContent = "Criar edição"; }
     });
     $("#newFromXlsx").addEventListener("change", async (e) => {
       const f = e.target.files[0]; if (!f) return;
       try {
         const ed = await readXlsx(f);
         ed.title = titleFromFile(f.name) || "Nova edição"; ed.source = f.name;
-        addEdition(ed); refresh(); bind.goTab("placar");
-      } catch (err) { $("#neMsg").textContent = "Erro ao importar: " + err.message; } finally { e.target.value = ""; }
+        ed.id = codeFor({ id: f.name.replace(/\.[^.]+$/, "").replace(/^\s*tabela\s+/i, ""), title: ed.title });
+        if (source === "sheets") await saveEditionToSheet(ed, { createOnly: true });
+        else { addEdition(ed); refresh(); }
+        bind.goTab("placar");
+      } catch (err) { flash("Erro ao importar: " + err.message); } finally { e.target.value = ""; }
     });
     $("#peopleList").addEventListener("change", (e) => {
       const t = e.target; if (!t.matches("[data-person]")) return;
@@ -1127,7 +1352,14 @@
     chartDefaults();
   }
   bind();
-  openEdition(new URL(location.href).searchParams.get("edicao") || defaultId());
-  refresh();
-  if (location.hash) bind.showTab(location.hash.slice(1));
+  const start = () => {
+    openEdition(new URL(location.href).searchParams.get("edicao") || defaultId());
+    refresh();
+    if (location.hash) bind.showTab(location.hash.slice(1));
+  };
+  if (SHEETS_URL) {
+    document.body.classList.add("loading");
+    $("#subtitle").textContent = "Carregando da planilha…";
+    loadFromSheets().finally(() => { document.body.classList.remove("loading"); start(); });
+  } else start();
 })();

@@ -153,6 +153,7 @@
           <p class="hint">Escolha o episódio, clique na célula e selecione o resultado. Tudo é recalculado na hora.</p>
         </div>
       </div>
+      <div class="sync-bar" data-sync></div>
       <div class="week-picker" id="weekPicker" role="group" aria-label="Episódio"></div>
       <div class="edit-head" id="editHead"></div>
       <div class="table-wrap"><table class="grid edit" id="editTable"></table></div>
@@ -162,8 +163,8 @@
     <div class="card">
       <div class="card-head">
         <div>
-          <h2>Publicar e arquivos</h2>
-          <p class="hint">O que você lança aqui fica salvo só neste navegador. Para aparecer no site, baixe o <b>data.js</b> (ele leva todas as edições), substitua o arquivo no projeto e faça o commit, ou use a planilha com o <b>publicar.bat</b>.</p>
+          <h2>Arquivos e cópia de segurança</h2>
+          <p class="hint">Com a planilha do Google ligada, use <b>Salvar na planilha</b> (barra acima). Sem ela, o que você lança fica só neste navegador: baixe o <b>data.js</b> (leva todas as edições), substitua no projeto e faça o commit. O data.js também é a cópia que o site usa se a planilha não responder.</p>
         </div>
       </div>
       <div class="actions">
@@ -187,6 +188,7 @@
           <p class="hint">Cada edição tem seus participantes, episódios e tabela de pontos. A marcada como <b>padrão</b> é a que o site abre.</p>
         </div>
       </div>
+      <div class="sync-bar" data-sync></div>
       <div class="table-wrap"><table class="rank plain" id="editionsTable"></table></div>
     </div>
 
@@ -195,14 +197,17 @@
         <div class="card-head">
           <div>
             <h2>Nova edição</h2>
-            <p class="hint">Mesmo molde: 2 provas por episódio e a tabela de pontos copiada de outra edição (dá para mudar depois em Regras).</p>
+            <p class="hint" id="neHint"></p>
           </div>
         </div>
         <form class="form" id="newEditionForm" autocomplete="off">
-          <div class="field"><label for="neTitle">Nome</label><input class="input" id="neTitle" required placeholder="ex.: MasterChef 2027"></div>
+          <div class="row2 wide-first">
+            <div class="field"><label for="neTitle">Nome</label><input class="input" id="neTitle" required placeholder="ex.: MasterChef 2027"></div>
+            <div class="field"><label for="neCode">Código (aba)</label><input class="input" id="neCode" placeholder="MC-2027" pattern="[Mm][Cc]-[A-Za-z0-9-]+" title="Formato MC-2027"></div>
+          </div>
           <div class="row2">
             <div class="field"><label for="neWeeks">Episódios</label><input class="input" id="neWeeks" type="number" min="1" max="40" value="15" required></div>
-            <div class="field"><label for="neScoring">Regras de pontuação</label><select class="input" id="neScoring"></select></div>
+            <div class="field" id="neScoringField"><label for="neScoring">Regras de pontuação</label><select class="input" id="neScoring"></select></div>
           </div>
           <div class="field">
             <label for="nePeople">Participantes <span class="count" id="nePeopleCount">0</span></label>
@@ -243,6 +248,7 @@
       <div class="card-head">
         <div>
           <h2>Tabela de pontuação</h2>
+          <p class="hint" id="rulesHint" style="color:var(--accent)"></p>
           <p class="hint">Pin = vitória individual (código V). Vitórias em equipe = VDP + VLE + VE + VD. A pontuação total nunca fica abaixo de 0. Desempate: pontos, pins, vitórias em equipe.</p>
         </div>
       </div>
@@ -256,6 +262,7 @@
 
 <script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.min.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
+<script src="config.js"></script>
 <script src="data.js"></script>
 <script src="app.js"></script>
 </body>
