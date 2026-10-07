@@ -18,6 +18,17 @@
 // Troque pela sua senha. O site pede essa senha para criar edições e salvar resultados.
 const ADMIN_KEY = "troque-esta-senha";
 
+// Só preencha se o script NÃO foi aberto pela planilha (Extensões → Apps Script).
+// É o trecho do link da planilha entre /d/ e /edit. Ex.: docs.google.com/spreadsheets/d/ESTE_TRECHO/edit
+const SPREADSHEET_ID = "";
+
+function ss_() {
+  if (SPREADSHEET_ID) return SpreadsheetApp.openById(SPREADSHEET_ID);
+  const ss = SpreadsheetApp.getActiveSpreadsheet();
+  if (!ss) throw new Error("Script sem planilha: abra-o pela planilha (Extensões → Apps Script) ou preencha SPREADSHEET_ID.");
+  return ss;
+}
+
 const SCORING_SHEET = "Pontuação";
 const EDITIONS_SHEET = "Edições";
 const EDITION_RX = /^MC-/i;
@@ -65,7 +76,7 @@ function json_(obj) {
 /* ---------------- leitura ---------------- */
 
 function readAll_() {
-  const ss = SpreadsheetApp.getActiveSpreadsheet();
+  const ss = ss_();
   const scoring = readScoring_(ss);
   const meta = readEditionsMeta_(ss);
   const editions = ss.getSheets()
@@ -177,7 +188,7 @@ function saveEdition_(ed, createOnly) {
   if (!ed || !ed.id) throw new Error("Edição sem código.");
   const id = String(ed.id).trim().toUpperCase();
   if (!EDITION_RX.test(id)) throw new Error("O código precisa começar com MC- (ex.: MC-2027).");
-  const ss = SpreadsheetApp.getActiveSpreadsheet();
+  const ss = ss_();
   ensureScoringSheet_(ss);
   let sh = ss.getSheetByName(id);
   if (sh && createOnly) throw new Error("Já existe uma aba " + id + " na planilha.");
@@ -270,7 +281,7 @@ function upsertEditionMeta_(ss, id, title) {
 }
 
 function setDefault_(id) {
-  const ss = SpreadsheetApp.getActiveSpreadsheet();
+  const ss = ss_();
   const sh = ensureEditionsSheet_(ss);
   const v = sh.getDataRange().getValues();
   let found = false;
@@ -305,7 +316,7 @@ function ensureEditionsSheet_(ss) {
 
 /** Rode esta função uma vez pelo editor (botão ▶ Executar) para criar as abas Pontuação e Edições. */
 function configurar() {
-  const ss = SpreadsheetApp.getActiveSpreadsheet();
+  const ss = ss_();
   ensureScoringSheet_(ss);
   ensureEditionsSheet_(ss);
   ss.toast("Abas Pontuação e Edições prontas. Agora publique como app da Web (Implantar > Nova implantação).");
