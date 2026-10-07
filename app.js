@@ -68,7 +68,14 @@
     const eds = raw.editions.map((e) => normalize(clone(e)));
     return { default: raw.default, editions: eds, hashes: Object.fromEntries(raw.editions.map((e) => [e.id, hash(e)])) };
   }
+  let sheetIds = new Set(); // edições que existem de fato na planilha
   function useBundle(raw, src) {
+    if (src === "sheets") {
+      // edições que só estão no data.js continuam visíveis (com botão “Enviar para a planilha”)
+      sheetIds = new Set(raw.editions.map((e) => e.id));
+      const extra = fileBundle.editions.filter((e) => !sheetIds.has(e.id));
+      raw = { ...raw, default: raw.default || fileBundle.default, editions: [...raw.editions, ...extra] };
+    }
     published = makePublished(raw);
     source = src;
     local = loadLocal();
@@ -788,6 +795,7 @@
         isOpen ? '<span class="badge cur">aberta</span>' : "",
         st === "local" ? `<span class="badge warn" title="${pubHint}">${sheets ? "ainda não está na planilha" : "só neste navegador"}</span>` : "",
         st === "changed" ? `<span class="badge warn" title="${pubHint}">alterada neste navegador</span>` : "",
+        sheets && !sheetIds.has(e.id) && st !== "local" ? '<span class="badge">só no data.js</span>' : "",
       ].join("");
       return `<tr>
         <td><b>${esc(e.title)}</b> <span class="code-tag">${esc(e.id)}</span>${badges}</td>
@@ -796,15 +804,16 @@
         <td>${leader ? `${esc(leader.name)} · ${fmt(leader.total)} pts` : '<span class="dash">—</span>'}</td>
         <td><div class="row-actions">
           ${isOpen ? "" : `<button class="btn sm" data-ed-open="${esc(e.id)}">Abrir</button>`}
-          ${e.id === def ? "" : `<button class="btn ghost sm" data-ed-default="${esc(e.id)}">Tornar padrão</button>`}
+          ${e.id === def || (sheets && !sheetIds.has(e.id)) ? "" : `<button class="btn ghost sm" data-ed-default="${esc(e.id)}">Tornar padrão</button>`}
+          ${sheets && !sheetIds.has(e.id) && st !== "local" ? `<button class="btn sm" data-migrate="${esc(e.id)}">Enviar para a planilha</button>` : ""}
           <button class="btn ghost sm" data-ed-xlsx="${esc(e.id)}" title="Baixar como planilha Excel">Excel</button>
           <button class="btn danger sm" data-ed-del="${esc(e.id)}" ${sheets && st !== "local" ? `title="Na planilha: apague a aba ${esc(e.id)} e recarregue"` : ""}>Excluir</button>
         </div></td>
       </tr>`;
     }).join("");
     // edições que existem no data.js mas ainda não na planilha (migração)
-    const missing = sheets ? fileBundle.editions.filter((e) => !published.hashes[e.id]) : [];
-    const migrate = missing.map((e) => `<tr class="migrate">
+    const missing = sheets ? fileBundle.editions.filter((e) => !sheetIds.has(e.id)) : [];
+    const migrate = missing.filter((e) => !editions.some((x) => x.id === e.id)).map((e) => `<tr class="migrate">
         <td><b>${esc(e.title)}</b> <span class="code-tag">${esc(e.id)}</span><span class="badge">só no data.js</span></td>
         <td class="c num">${e.competitors.length}</td><td class="c">—</td><td class="hint">Ainda não está na planilha do Google.</td>
         <td><div class="row-actions"><button class="btn sm" data-migrate="${esc(e.id)}">Enviar para a planilha</button></div></td></tr>`).join("");
@@ -954,7 +963,7 @@
         openEdition(id); refresh();
         flash(okLoad ? "Dados recarregados da planilha." : "A planilha não respondeu: " + sourceInfo.error);
       } else if (act === "save") {
-        await saveEditionToSheet(data, { createOnly: edStatus(data.id) === "local" });
+        await saveEditionToSheet(data, { createOnly: edStatus(data.id) === "local" && !sheetIds.has(data.id) && !fileBundle.editions.some((e) => e.id === data.id) });
         flash(`“${data.title}” salva na planilha.`);
       } else if (act === "discard") {
         $("#resetData").click();
