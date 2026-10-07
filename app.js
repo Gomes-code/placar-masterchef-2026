@@ -204,7 +204,7 @@
 
     // cor fixa por participante ativo (ordem alfabética: a cor segue a pessoa, nunca a posição)
     const active = comps.filter((c) => !c.eliminated).sort((a, b) => a.name.localeCompare(b.name, "pt-BR"));
-    active.forEach((c, i) => (c.slot = i < 8 ? i + 1 : null));
+    active.forEach((c, i) => { c.slot = i < 8 ? i + 1 : null; c.extra = i < 8 ? null : i - 8; });
     comps.filter((c) => c.eliminated).forEach((c) => (c.slot = null));
 
     return { pts, currentWeek, comps, sorted, active };
@@ -255,6 +255,9 @@
   /* ---------------- helpers visuais ---------------- */
   const css = (v) => getComputedStyle(document.documentElement).getPropertyValue(v).trim();
   const seriesColor = (c) => (c.slot ? css(`--series-${c.slot}`) : css("--series-muted"));
+  // a partir do 9º participante na disputa: cores extras só para o círculo do nome (o gráfico segue com 8 cores)
+  const EXTRA_COLORS = ["#0e9aa7", "#a0612b", "#9b4fd0", "#7a8a1a", "#5b6fd6", "#ff7f6e", "#b8327a", "#c9a227", "#34b3e4", "#6cbf3a", "#d4573b", "#3f8f6b"];
+  const avatarColor = (c) => (c.slot ? seriesColor(c) : c.extra != null ? EXTRA_COLORS[c.extra % EXTRA_COLORS.length] : css("--series-muted"));
   function codeClass(code) {
     if (code === "0") return "c-none";
     if (code === "-") return "c-gone";
@@ -278,7 +281,7 @@
   };
   const codeText = (code) => (code === "0" ? "·" : code === "-" ? "" : code);
   const initials = (n) => n.replace(/\./g, "").split(/\s+/).map((p) => p[0]).join("").slice(0, 2).toUpperCase();
-  const avatar = (c) => `<span class="avatar${c.photo ? " has-photo" : ""}" style="border-color:${seriesColor(c)}">${c.photo ? `<img src="${esc(c.photo)}" alt="" loading="lazy" referrerpolicy="no-referrer" onerror="this.remove()">` : ""}<span>${esc(initials(c.name))}</span></span>`;
+  const avatar = (c) => `<span class="avatar${c.photo ? " has-photo" : ""}" style="border-color:${avatarColor(c)}">${c.photo ? `<img src="${esc(c.photo)}" alt="" loading="lazy" referrerpolicy="no-referrer" onerror="this.remove()">` : ""}<span>${esc(initials(c.name))}</span></span>`;
   const pinIcon = (cls = "pin") => `<svg class="${cls}" aria-hidden="true"><use href="#pin"/></svg>`;
   const pinsHtml = (n) => (n ? `<span class="pins" title="${n} pin${n > 1 ? "s" : ""}">${pinIcon().repeat(n)}</span>` : '<span class="dash">—</span>');
   const shortWeek = (label) => label.replace(/^Semana\s*/i, "S").replace(/^Repescagem$/i, "Rep");
